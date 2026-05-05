@@ -260,6 +260,45 @@ impl SearchState {
         self.move_selected_down_by(1);
     }
 
+    /// Move to the first match in the next file (issue #4)
+    fn move_to_next_file(&mut self) {
+        if self.results.is_empty() {
+            return;
+        }
+        let current_path = &self.results[self.primary_selected_pos()].search_result.path;
+        // Search forward for a result with a different path
+        for i in (self.primary_selected_pos() + 1)..self.results.len() {
+            if &self.results[i].search_result.path != current_path {
+                self.move_primary_sel(i);
+                return;
+            }
+        }
+        // Wrap to first file if at the last file
+        if &self.results[0].search_result.path != current_path {
+            self.move_primary_sel(0);
+        }
+    }
+
+    /// Move to the first match in the previous file (issue #4)
+    fn move_to_prev_file(&mut self) {
+        if self.results.is_empty() {
+            return;
+        }
+        let current_path = &self.results[self.primary_selected_pos()].search_result.path;
+        // Search backward for a result with a different path
+        for i in (0..self.primary_selected_pos()).rev() {
+            if &self.results[i].search_result.path != current_path {
+                self.move_primary_sel(i);
+                return;
+            }
+        }
+        // Wrap to last file if at the first file
+        let last = self.results.len() - 1;
+        if &self.results[last].search_result.path != current_path {
+            self.move_primary_sel(last);
+        }
+    }
+
     fn move_selected_up_full_page(&mut self) {
         self.move_selected_up_by(max(self.num_displayed.unwrap(), 1));
     }
@@ -302,6 +341,10 @@ impl SearchState {
         self.selected_fields_mut().iter_mut().for_each(|selected| {
             selected.search_result.included = !all_included;
         });
+        // Auto-advance to next result after toggling (issue #5)
+        if !self.results.is_empty() {
+            self.move_selected_down();
+        }
     }
 
     fn toggle_all_selected(&mut self) {
@@ -653,10 +696,27 @@ struct HintState {
     has_shown_multiline_hint: bool,
 }
 
+/// State for the interactive file finder popup (issue #7)
+#[derive(Debug)]
+pub struct FileFinderState {
+    pub query: String,
+    pub entries: Vec<String>,
+    pub selected: usize,
+    pub target_field: FileFinderTarget,
+    pub base_dir: PathBuf,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FileFinderTarget {
+    IncludeFiles,
+    ExcludeFiles,
+}
+
 #[derive(Debug)]
 pub struct UIState {
     pub current_screen: Screen,
     pub popup: Option<Popup>,
+    pub file_finder: Option<FileFinderState>,
     toast: Option<Toast>,
     errors: Vec<AppError>,
     hints: HintState,
@@ -667,6 +727,7 @@ impl UIState {
         Self {
             current_screen,
             popup: None,
+            file_finder: None,
             toast: None,
             errors: Vec::new(),
             hints: HintState::default(),
@@ -1396,6 +1457,19 @@ impl<'a> App {
             return;
         }
 
+        // Guard: no results selected for replacement (opt-in model)
+        if let Screen::SearchFields(ref state) = self.ui_state.current_screen {
+            if let Some(ref search_state) = state.search_state {
+                if search_state.results.iter().all(|r| !r.search_result.included) {
+                    self.add_error(AppError {
+                        name: "No results selected".to_string(),
+                        long: "Press Space to include results, or 'a' to select all, before replacing.".to_string(),
+                    });
+                    return;
+                }
+            }
+        }
+
         let temp_placeholder = Screen::SearchFields(SearchFieldsState::default());
         match mem::replace(
             &mut self.ui_state.current_screen,
@@ -1863,6 +1937,14 @@ impl<'a> App {
                 self.get_search_state_unwrap().move_selected_up();
                 EventHandlingResult::Rerender
             }
+            CommandSearchFocusResults::MoveNextFile => {
+                self.get_search_state_unwrap().move_to_next_file();
+                EventHandlingResult::Rerender
+            }
+            CommandSearchFocusResults::MovePrevFile => {
+                self.get_search_state_unwrap().move_to_prev_file();
+                EventHandlingResult::Rerender
+            }
             CommandSearchFocusResults::MoveDownHalfPage => {
                 self.get_search_state_unwrap()
                     .move_selected_down_half_page();
@@ -2019,6 +2101,15 @@ impl<'a> App {
         &mut self,
         key_event: KeyEvent,
     ) -> Either<Command, EventHandlingResult> {
+        // File finder takes priority over everything except Quit
+        if self.ui_state.file_finder.is_some() {
+            if matches!(key_event.code, KeyCode::Esc) {
+                self.close_file_finder();
+                return Right(EventHandlingResult::Rerender);
+            }
+            return Right(self.handle_file_finder_key(key_event));
+        }
+
         let maybe_event = self
             .key_map
             .lookup(&self.ui_state.current_screen, key_event);
@@ -2050,6 +2141,18 @@ impl<'a> App {
             // If we're in SearchFields focus, treat unmatched keys as text input
             if let Screen::SearchFields(state) = &self.ui_state.current_screen {
                 if state.focussed_section == FocussedSection::SearchFields {
+                    // Tab opens file finder for include/exclude fields (issue #7)
+                    if key_event.code == KeyCode::Tab {
+                        let target = match self.search_fields.highlighted_field().name {
+                            FieldName::IncludeFiles => Some(FileFinderTarget::IncludeFiles),
+                            FieldName::ExcludeFiles => Some(FileFinderTarget::ExcludeFiles),
+                            _ => None,
+                        };
+                        if let Some(target) = target {
+                            self.open_file_finder(target);
+                            return Right(EventHandlingResult::Rerender);
+                        }
+                    }
                     Command::SearchFields(CommandSearchFields::SearchFocusFields(
                         CommandSearchFocusFields::EnterChars(key_event.code, key_event.modifiers),
                     ))
@@ -2181,7 +2284,7 @@ impl<'a> App {
                                         line_number,
                                         line,
                                         line_ending,
-                                        true,
+                                        false,
                                     );
                                     // Ignore error - likely state reset, thread about to be killed
                                     let _ = sender_for_search
@@ -2247,8 +2350,130 @@ impl<'a> App {
         self.ui_state.popup = Some(popup);
     }
 
+    /// Open file finder popup for include/exclude fields (issue #7)
+    fn open_file_finder(&mut self, target: FileFinderTarget) {
+        let base_dir = match &self.input_source {
+            InputSource::Directory(dir) => dir.clone(),
+            InputSource::Stdin(_) => PathBuf::from("."),
+        };
+        let entries = Self::list_directory_entries(&base_dir, "", 50);
+        self.ui_state.file_finder = Some(FileFinderState {
+            query: String::new(),
+            entries,
+            selected: 0,
+            target_field: target,
+            base_dir,
+        });
+    }
+
+    fn close_file_finder(&mut self) {
+        self.ui_state.file_finder = None;
+    }
+
+    fn handle_file_finder_key(&mut self, key_event: KeyEvent) -> EventHandlingResult {
+        let Some(finder) = &mut self.ui_state.file_finder else {
+            return EventHandlingResult::None;
+        };
+
+        match key_event.code {
+            KeyCode::Enter => {
+                // Insert selected entry into the target field
+                let selected_entry = finder.entries.get(finder.selected).cloned();
+                let target = finder.target_field;
+                self.close_file_finder();
+                if let Some(entry) = selected_entry {
+                    self.insert_file_path(target, &entry);
+                }
+                EventHandlingResult::Rerender
+            }
+            KeyCode::Down | KeyCode::Char('j') => {
+                if !finder.entries.is_empty() {
+                    finder.selected = (finder.selected + 1) % finder.entries.len();
+                }
+                EventHandlingResult::Rerender
+            }
+            KeyCode::Up | KeyCode::Char('k') => {
+                if !finder.entries.is_empty() {
+                    finder.selected = finder
+                        .selected
+                        .checked_sub(1)
+                        .unwrap_or(finder.entries.len() - 1);
+                }
+                EventHandlingResult::Rerender
+            }
+            KeyCode::Backspace => {
+                finder.query.pop();
+                finder.entries = Self::list_directory_entries(&finder.base_dir, &finder.query, 50);
+                finder.selected = 0;
+                EventHandlingResult::Rerender
+            }
+            KeyCode::Char(c) => {
+                finder.query.push(c);
+                finder.entries = Self::list_directory_entries(&finder.base_dir, &finder.query, 50);
+                finder.selected = 0;
+                EventHandlingResult::Rerender
+            }
+            _ => EventHandlingResult::None,
+        }
+    }
+
+    fn insert_file_path(&mut self, target: FileFinderTarget, path: &str) {
+        let field = match target {
+            FileFinderTarget::IncludeFiles => self.search_fields.include_files_mut(),
+            FileFinderTarget::ExcludeFiles => self.search_fields.exclude_files_mut(),
+        };
+        let current = field.text();
+        let separator = if current.is_empty() || current.ends_with(',') { "" } else { ", " };
+        let new_text = format!("{current}{separator}{path}");
+        // Use enter_chars to insert the text
+        let chars: Vec<char> = new_text.chars().collect();
+        let existing: Vec<char> = current.chars().collect();
+        for c in chars.iter().skip(existing.len()) {
+            field.enter_char(*c);
+        }
+    }
+
+    fn list_directory_entries(base_dir: &Path, query: &str, limit: usize) -> Vec<String> {
+        let mut entries = Vec::new();
+        let query_lower = query.to_lowercase();
+
+        // List top-level directories and files
+        if let Ok(read_dir) = std::fs::read_dir(base_dir) {
+            for entry in read_dir.flatten() {
+                if entries.len() >= limit {
+                    break;
+                }
+                let name = entry.file_name().to_string_lossy().to_string();
+                if !query_lower.is_empty()
+                    && !name.to_lowercase().contains(&query_lower)
+                {
+                    continue;
+                }
+                let suffix = if entry.file_type().map_or(false, |ft| ft.is_dir()) {
+                    "/"
+                } else {
+                    ""
+                };
+                entries.push(format!("{name}{suffix}"));
+            }
+        }
+
+        entries.sort_by(|a, b| {
+            // Directories first
+            let a_dir = a.ends_with('/');
+            let b_dir = b.ends_with('/');
+            b_dir.cmp(&a_dir).then_with(|| a.to_lowercase().cmp(&b.to_lowercase()))
+        });
+        entries.truncate(limit);
+        entries
+    }
+
     pub fn toast_message(&self) -> Option<&str> {
         self.ui_state.toast.as_ref().map(|t| t.message.as_str())
+    }
+
+    pub fn file_finder(&self) -> Option<&FileFinderState> {
+        self.ui_state.file_finder.as_ref()
     }
 
     fn show_toast(&mut self, message: String, duration: Duration) {
@@ -2680,7 +2905,7 @@ mod tests {
                     1,
                     format!("test line {i}").to_string(),
                     LineEnding::Lf,
-                    true,
+                    false,
                 ),
                 replacement: format!("replacement {i}").to_string(),
                 replace_result: None,
@@ -2883,18 +3108,19 @@ mod tests {
 
         let mut state = build_test_search_state(3);
 
+        // Results start unselected (#2: opt-in replacement)
+        assert_eq!(included(&state), [false, false, false]);
+        // Toggle selected (index 0): unselected → selected, then auto-move down (#5)
+        state.toggle_selected_inclusion();
+        assert_eq!(included(&state), [true, false, false]);
+        assert_eq!(state.primary_selected_pos(), 1);
+        // Toggle again: unselected → selected at index 1, auto-move down
+        state.toggle_selected_inclusion();
+        assert_eq!(included(&state), [true, true, false]);
+        assert_eq!(state.primary_selected_pos(), 2);
+        // Toggle at last item: unselected → selected, stays at 2 (wraps to 0)
+        state.toggle_selected_inclusion();
         assert_eq!(included(&state), [true, true, true]);
-        state.toggle_selected_inclusion();
-        assert_eq!(included(&state), [false, true, true]);
-        state.toggle_selected_inclusion();
-        assert_eq!(included(&state), [true, true, true]);
-        state.toggle_selected_inclusion();
-        assert_eq!(included(&state), [false, true, true]);
-        state.move_selected_down();
-        state.toggle_selected_inclusion();
-        assert_eq!(included(&state), [false, false, true]);
-        state.toggle_selected_inclusion();
-        assert_eq!(included(&state), [false, true, true]);
     }
 
     #[tokio::test]
@@ -3065,14 +3291,16 @@ mod tests {
             })
         );
         assert_eq!(state.selected_fields(), &state.results[2..=4]);
+        // All start unselected (opt-in model)
         assert_eq!(
             state
                 .results
                 .iter()
                 .map(|res| res.search_result.included)
                 .collect::<Vec<_>>(),
-            vec![true, true, true, true, true, true]
+            vec![false, false, false, false, false, false]
         );
+        // Toggle selected (indices 2-4): all unselected → selected, then auto-move
         state.toggle_selected_inclusion();
         assert_eq!(
             state
@@ -3080,31 +3308,34 @@ mod tests {
                 .iter()
                 .map(|res| res.search_result.included)
                 .collect::<Vec<_>>(),
-            vec![true, true, false, false, false, true]
+            vec![false, false, true, true, true, false]
         );
+        // After toggle, moves to next: primary goes from 2 to 3 (within multiselect)
         assert_eq!(
             state.selected,
             Selected::Multi(MultiSelected {
                 anchor: 4,
-                primary: 2,
+                primary: 3,
             })
         );
-        assert_eq!(state.selected_fields(), &state.results[2..=4]);
+        // Selected range is now min(3,4)..=max(3,4) = 3..=4
+        assert_eq!(state.selected_fields(), &state.results[3..=4]);
         state.toggle_multiselect_mode();
-        assert_eq!(state.selected, Selected::Single(2));
-        assert_eq!(state.selected_fields(), &state.results[2..=2]);
+        assert_eq!(state.selected, Selected::Single(3));
+        assert_eq!(state.selected_fields(), &state.results[3..=3]);
         state.move_selected_up();
         state.move_selected_up();
-        assert_eq!(state.selected, Selected::Single(0));
-        assert_eq!(state.selected_fields(), &state.results[0..=0]);
+        assert_eq!(state.selected, Selected::Single(1));
+        assert_eq!(state.selected_fields(), &state.results[1..=1]);
         state.toggle_selected_inclusion();
+        // Toggle at index 1 (unselected → selected), auto-moves to 2
         assert_eq!(
             state
                 .results
                 .iter()
                 .map(|res| res.search_result.included)
                 .collect::<Vec<_>>(),
-            vec![false, true, false, false, false, true]
+            vec![false, true, true, true, true, false]
         );
     }
 

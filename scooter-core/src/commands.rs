@@ -52,6 +52,8 @@ pub(crate) enum CommandSearchFocusResults {
 
     MoveDown,
     MoveUp,
+    MoveNextFile,
+    MovePrevFile,
     MoveDownHalfPage,
     MoveDownFullPage,
     MoveUpHalfPage,
@@ -175,6 +177,8 @@ impl KeyMap {
                 (open_in_editor, CommandSearchFocusResults::OpenInEditor),
                 (move_down, CommandSearchFocusResults::MoveDown),
                 (move_up, CommandSearchFocusResults::MoveUp),
+                (move_next_file, CommandSearchFocusResults::MoveNextFile),
+                (move_prev_file, CommandSearchFocusResults::MovePrevFile),
                 (
                     move_down_half_page,
                     CommandSearchFocusResults::MoveDownHalfPage

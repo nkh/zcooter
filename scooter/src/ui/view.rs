@@ -8,7 +8,10 @@ use ratatui::{
     widgets::{Block, Cell, Clear, List, ListItem, Padding, Paragraph, Row, Table, Wrap},
 };
 use scooter_core::{
-    app::{App, Event, FocussedSection, InputSource, Popup, Screen, SearchPhase, SearchState},
+    app::{
+        App, Event, FocussedSection, FileFinderState, InputSource, Popup, Screen, SearchPhase,
+        SearchState,
+    },
     diff::{Diff, DiffColour, line_diff},
     errors::AppError,
     fields::{Field, SearchFields},
@@ -2066,6 +2069,10 @@ pub fn render(app: &mut App, frame: &mut Frame<'_>) {
         None => {}
     }
 
+    if let Some(finder) = app.file_finder() {
+        render_file_finder_popup(finder, frame, content_area);
+    }
+
     if let Some(message) = app.toast_message() {
         render_toast(message, frame, content_area);
     }
@@ -2232,6 +2239,63 @@ fn create_popup_block(title: &str) -> Block<'_> {
         .title(title)
         .title_alignment(Alignment::Center)
         .padding(Padding::horizontal(1))
+}
+
+fn render_file_finder_popup(finder: &FileFinderState, frame: &mut Frame<'_>, area: Rect) {
+    if area.width == 0 || area.height == 0 {
+        return;
+    }
+
+    let popup_height = 18.min(area.height - 2);
+    let popup_width = 60.min(area.width - 4);
+
+    let [popup_area] = Layout::vertical([Constraint::Length(popup_height)])
+        .flex(Flex::Center)
+        .areas(area);
+    let [popup_area] = Layout::horizontal([Constraint::Length(popup_width)])
+        .flex(Flex::Center)
+        .areas(popup_area);
+
+    frame.render_widget(Clear, popup_area);
+
+    // Search query line
+    let query_line = format!("> {}", finder.query);
+    let list_height = popup_height.saturating_sub(4) as usize; // border + query + help
+    let visible_entries: Vec<_> = finder
+        .entries
+        .iter()
+        .take(list_height)
+        .collect();
+
+    let mut lines: Vec<Line<'_>> = vec![Line::from(Span::styled(
+        query_line,
+        Style::new().fg(Color::Cyan),
+    ))];
+
+    for (i, entry) in visible_entries.iter().enumerate() {
+        if i == finder.selected {
+            lines.push(Line::from(Span::styled(
+                format!("  {entry}"),
+                Style::new().fg(Color::Black).bg(Color::Gray),
+            )));
+        } else {
+            lines.push(Line::from(Span::raw(format!("  {entry}"))));
+        }
+    }
+
+    lines.push(Line::from(Span::styled(
+        " Type to filter | Enter: select | Esc: close",
+        Style::new().fg(Color::DarkGray),
+    )));
+
+    let paragraph = Paragraph::new(lines).block(
+        Block::bordered()
+            .border_style(Color::Green)
+            .title("File Finder")
+            .title_alignment(Alignment::Center),
+    );
+
+    frame.render_widget(paragraph, popup_area);
 }
 
 #[cfg(test)]

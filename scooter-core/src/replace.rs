@@ -2163,7 +2163,7 @@ mod tests {
             let (content, _) = line_content(&results[0].search_result);
             assert_eq!(content, "search target");
             assert_eq!(results[0].replacement, "replace target");
-            assert!(results[0].search_result.included);
+            assert!(!results[0].search_result.included); // opt-in model
         }
 
         #[test]

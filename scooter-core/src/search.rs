@@ -616,7 +616,7 @@ pub fn search_file(
                 line_number,
                 line_content,
                 line_ending,
-                true,
+                false,
             );
             results.push(result);
         }
@@ -817,7 +817,7 @@ fn create_search_result_from_bytes(
         byte_start: start_byte,
         byte_end: end_byte,
         content: expected_content,
-        included: true,
+        included: false,
     })
 }
 
@@ -1495,7 +1495,7 @@ mod tests {
             assert_eq!(results[0].start_line_number(), 1);
             assert_eq!(results[0].end_line_number(), 3);
             assert_eq!(results[0].path, None);
-            assert_eq!(results[0].included, true);
+            assert_eq!(results[0].included, false);
             assert_eq!(byte_range_content(&results[0]), "ne1\nline2\nli");
         }
 
