@@ -435,20 +435,22 @@ You can pipe content from Helix to scooter, and it will write the updated conten
 You can use Vim's terminal mode to run scooter within a split or popup. Here are some useful mappings:
 
 ```vim
-" Open scooter in a vertical split
-nnoremap <leader>s :vertical terminal scooter<CR>
+" Open scooter full screen (split closes automatically when scooter exits)
+nnoremap <leader>s :20split +terminal\|call feedkeys("scooter \<CR>")<CR>
 
 " Open scooter for the current file
-nnoremap <leader>f :vertical terminal scooter %<CR>
+nnoremap <leader>f :20split +terminal\|call feedkeys("scooter % \<CR>")<CR>
 
 " Open scooter for all files in the current git repo
-nnoremap <leader>a :vertical terminal scooter $(git rev-parse --show-toplevel)<CR>
+nnoremap <leader>a :20split +terminal\|call feedkeys("scooter $(git rev-parse --show-toplevel) \<CR>")<CR>
 
 " Open scooter with visual selection as the search text
-vnoremap <leader>r y:vertical terminal scooter --fixed-strings --search-text <C-R>"<CR>
+vnoremap <leader>r y:20split +terminal\|call feedkeys("scooter --fixed-strings --search-text \<C-R>" \<CR>")<CR>
 ```
 
-For `:terminal scooter %`, the `%` expands to the current file path in Vim/Neovim. If you're using Neovim, you may prefer the [ToggleTerm](#option-2-using-toggleterm) or [snacks.nvim](#option-1-using-snacksnvim) integration above, which provides a floating window experience.
+These use a small horizontal split (`20split`) so your edits stay visible alongside scooter. The terminal split closes automatically as soon as scooter exits, leaving your previous window layout intact. Change `20split` to `split` for a 50/50 split, or remove it for full-screen scooter.
+
+For `:terminal scooter %`, the `%` expands to the current file path in Vim/Neovim. If you're using Neovim, you may prefer the [ToggleTerm](#option-2-using-toggleterm) or [snacks.nvim](#snacksnvim) integration above, which provides a floating window experience.
 
 To open files from scooter back in Vim, add the following to your [scooter config file](#configuration-options):
 
