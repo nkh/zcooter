@@ -212,13 +212,13 @@ pub struct KeysSearchFocusResults {
     /// Open the currently selected search result in your editor. The editor command can be overriden using the `editor_open` section of your config.
     pub open_in_editor: Keys,
 
-    /// Navigate to the search result below
+    /// Navigate to the search result below (wraps to top at end)
     pub move_down: Keys,
-    /// Navigate to the search result above
+    /// Navigate to the search result above (wraps to bottom at top)
     pub move_up: Keys,
-    /// Navigate to the next file (first match in next file)
+    /// Navigate to the next file (first match in next file). Default: Ctrl+Down (hard-coded)
     pub move_next_file: Keys,
-    /// Navigate to the previous file (first match in previous file)
+    /// Navigate to the previous file (first match in previous file). Default: Ctrl+Up (hard-coded)
     pub move_prev_file: Keys,
     /// Navigate to the search result half a page below
     pub move_down_half_page: Keys,
@@ -280,7 +280,7 @@ impl Default for KeysSearchFocusResults {
             move_bottom: keys![KeyEvent::new(KeyCode::Char('G'), KeyModifiers::NONE)],
 
             toggle_selected_inclusion: keys![KeyEvent::new(KeyCode::Char(' '), KeyModifiers::NONE)],
-            toggle_all_selected: keys![KeyEvent::new(KeyCode::Char('g'), KeyModifiers::CONTROL)],
+            toggle_all_selected: keys![KeyEvent::new(KeyCode::Char('w'), KeyModifiers::CONTROL)],
             toggle_multiselect_mode: keys![KeyEvent::new(KeyCode::Char('v'), KeyModifiers::NONE)],
 
             flip_multiselect_direction: keys![KeyEvent::new(KeyCode::Char(';'), KeyModifiers::ALT)],

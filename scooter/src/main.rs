@@ -29,7 +29,7 @@ mod ui;
 #[command(version)]
 #[allow(clippy::struct_excessive_bools)]
 struct Args {
-    /// Directory in which to search
+    /// Directory or file in which to search (file mode searches a single file)
     #[arg(index = 1, value_parser = parse_search_dir, default_value = ".")]
     directory: PathBuf,
 
@@ -137,7 +137,7 @@ fn parse_search_dir(dir: &str) -> anyhow::Result<PathBuf> {
     if path.exists() {
         Ok(path)
     } else {
-        bail!("'{dir}' does not exist. Please provide a valid path.")
+        bail!("'{dir}' does not exist. Please provide a valid path to a file or directory.")
     }
 }
 
@@ -195,6 +195,9 @@ fn detect_and_read_stdin(args: &Args) -> anyhow::Result<Option<String>> {
 }
 
 fn validate_stdin_usage(args: &Args, stdin_content: Option<&str>) -> anyhow::Result<()> {
+    // Check if target is a single file (not a directory)
+    let is_single_file = args.directory.is_file();
+
     if stdin_content.is_some() {
         // File system args
         if args.hidden {
@@ -212,6 +215,23 @@ fn validate_stdin_usage(args: &Args, stdin_content: Option<&str>) -> anyhow::Res
     } else if args.print_on_exit {
         bail!("Cannot use --print-on-exit when not processing stdin");
     }
+
+    // File-specific flags don't apply when searching a single file
+    if is_single_file {
+        if args.hidden {
+            bail!("Cannot use --hidden flag when searching a single file");
+        }
+        if args.include_git_folders {
+            bail!("Cannot use --include-git-folders flag when searching a single file");
+        }
+        if args.files_to_include.is_some() {
+            bail!("Cannot use --files-to-include when searching a single file");
+        }
+        if args.files_to_exclude.is_some() {
+            bail!("Cannot use --files-to-exclude when searching a single file");
+        }
+    }
+
     Ok(())
 }
 

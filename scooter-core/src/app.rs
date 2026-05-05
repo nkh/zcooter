@@ -2146,8 +2146,8 @@ impl<'a> App {
         if key_event.modifiers.contains(KeyModifiers::CONTROL) {
             if let KeyCode::Char(ch) = key_event.code {
                 match ch {
-                    'g' => {
-                        // Ctrl+G: toggle all files (works from any focus)
+                    'w' => {
+                        // Ctrl+W: toggle all files (works from any focus)
                         if let Some(state) = self.get_search_state_if_results() {
                             state.toggle_all_selected();
                             return Right(EventHandlingResult::Rerender);
@@ -2744,8 +2744,18 @@ impl<'a> App {
                                 "back to search fields",
                                 Show::Both,
                             ),
-                            keymap!(search.results.move_down, "down", Show::FullOnly),
-                            keymap!(search.results.move_up, "up", Show::FullOnly),
+                            keymap!(search.results.move_down, "down (wraps)", Show::FullOnly),
+                            keymap!(search.results.move_up, "up (wraps)", Show::FullOnly),
+                            keymap!(
+                                search.results.move_next_file,
+                                "next file",
+                                Show::FullOnly
+                            ),
+                            keymap!(
+                                search.results.move_prev_file,
+                                "prev file",
+                                Show::FullOnly
+                            ),
                             keymap!(
                                 search.results.move_up_half_page,
                                 "up half a page",
@@ -2846,7 +2856,31 @@ impl<'a> App {
             keymap!(general.quit, "quit", Show::Both),
         ];
 
-        let all_keys = current_screen_keys.into_iter().chain(additional_keys);
+        // Hard-coded shortcuts handled by interception (not in keymap)
+        let intercepted_keys: Vec<(String, &str, Show)> = {
+            let mut k = vec![];
+            // Field focus shortcuts
+            k.push(("<C-s>".to_string(), "focus search", Show::FullOnly));
+            k.push(("<C-r>".to_string(), "focus replace", Show::FullOnly));
+            k.push(("<C-i>".to_string(), "focus include", Show::FullOnly));
+            k.push(("<C-e>".to_string(), "focus exclude", Show::FullOnly));
+            k.push(("<C-t>".to_string(), "focus fixed toggle", Show::FullOnly));
+            // Toggle all (hard-coded)
+            k.push(("<C-w>".to_string(), "toggle all", Show::FullOnly));
+            // File navigation (Ctrl+Up/Down)
+            if on_search_results {
+                k.push(("<C-up>".to_string(), "prev file", Show::FullOnly));
+                k.push(("<C-down>".to_string(), "next file", Show::FullOnly));
+                k.push(("<C-left>".to_string(), "narrow file column", Show::FullOnly));
+                k.push(("<C-right>".to_string(), "widen file column", Show::FullOnly));
+            }
+            k
+        };
+
+        let all_keys = current_screen_keys
+            .into_iter()
+            .chain(additional_keys)
+            .chain(intercepted_keys);
 
         all_keys
             .filter_map(move |(from, to, show)| {
