@@ -490,6 +490,9 @@ pub struct SearchFieldsState {
     next_search_generation: u64,
     /// Generation of the currently pending debounced search, if any.
     pending_search_generation: Option<u64>,
+    /// Inline replacement progress — shown as a banner overlay instead of
+    /// switching to a separate screen.
+    pub replacement_progress: Option<PerformingReplacementState>,
 }
 
 impl Default for SearchFieldsState {
@@ -502,6 +505,7 @@ impl Default for SearchFieldsState {
             last_scheduled_key: None,
             next_search_generation: 0,
             pending_search_generation: None,
+            replacement_progress: None,
         }
     }
 }
@@ -581,6 +585,7 @@ pub enum Popup {
     Error,
     Help,
     Text { title: String, body: String },
+    ReplacementResults(ReplaceState),
 }
 
 #[derive(Debug, Clone)]
@@ -971,8 +976,16 @@ fn generate_escape_deprecation_message(quit_keymap: Option<KeyEvent>) -> String 
 macro_rules! get_bg_receiver {
     ($self:expr) => {
         match &mut $self.ui_state.current_screen {
-            Screen::SearchFields(SearchFieldsState { search_state, .. }) => {
-                search_state.as_mut().map(|s| &mut s.processing_receiver)
+            Screen::SearchFields(SearchFieldsState {
+                search_state,
+                replacement_progress,
+                ..
+            }) => {
+                if let &mut Some(ref mut rp) = replacement_progress {
+                    Some(&mut rp.processing_receiver)
+                } else {
+                    search_state.as_mut().map(|s| &mut s.processing_receiver)
+                }
             }
             Screen::PerformingReplacement(PerformingReplacementState {
                 processing_receiver,
@@ -1097,6 +1110,14 @@ impl<'a> App {
     fn cancel_replacement(&mut self) {
         if let Screen::PerformingReplacement(PerformingReplacementState { cancelled, .. }) =
             &mut self.ui_state.current_screen
+        {
+            cancelled.store(true, Ordering::Relaxed);
+        }
+        // Also check inline replacement progress
+        if let Screen::SearchFields(SearchFieldsState {
+            replacement_progress: Some(PerformingReplacementState { cancelled, .. }),
+            ..
+        }) = &mut self.ui_state.current_screen
         {
             cancelled.store(true, Ordering::Relaxed);
         }
@@ -1380,15 +1401,15 @@ impl<'a> App {
             &mut self.ui_state.current_screen,
             temp_placeholder, // Will get reset if we are not on `SearchComplete` screen
         ) {
-            Screen::SearchFields(SearchFieldsState {
-                search_state: Some(state),
-                ..
-            }) => {
-                let (background_processing_sender, background_processing_receiver) =
-                    mpsc::unbounded_channel();
-                let cancelled = Arc::new(AtomicBool::new(false));
-                let total_replacements = state
-                    .results
+            Screen::SearchFields(mut search_fields_state) => {
+                let Some(state) = search_fields_state.search_state.take() else {
+                    // No search state — put it back and return
+                    self.ui_state.current_screen = Screen::SearchFields(search_fields_state);
+                    return;
+                };
+
+                let results = state.results;
+                let total_replacements = results
                     .iter()
                     .filter(|r| r.search_result.included)
                     .count();
@@ -1399,8 +1420,12 @@ impl<'a> App {
                 };
                 match searcher {
                     Searcher::FileSearcher(file_searcher) => {
+                        let (background_processing_sender, background_processing_receiver) =
+                            mpsc::unbounded_channel();
+                        let cancelled = Arc::new(AtomicBool::new(false));
+
                         replace::perform_replacement(
-                            state.results,
+                            results,
                             background_processing_sender.clone(),
                             cancelled.clone(),
                             replacements_completed.clone(),
@@ -1408,6 +1433,16 @@ impl<'a> App {
                             Some(file_searcher),
                             self.file_content_provider.clone(),
                         );
+
+                        // Stay on SearchFields screen — show progress inline
+                        search_fields_state.replacement_progress =
+                            Some(PerformingReplacementState::new(
+                                background_processing_receiver,
+                                cancelled,
+                                replacements_completed,
+                                total_replacements,
+                            ));
+                        // search_state stays None — results have been consumed
                     }
                     Searcher::TextSearcher { search_config } => {
                         let InputSource::Stdin(ref stdin) = self.input_source else {
@@ -1417,20 +1452,16 @@ impl<'a> App {
                             .sender
                             .send(Event::ExitAndReplace(ExitAndReplaceState {
                                 stdin: Arc::clone(stdin),
-                                replace_results: state.results,
+                                replace_results: results,
                                 search_config,
                             }))
                             .expect("Failed to send ExitAndReplace event");
+                        // stdin mode exits immediately — no need to restore screen
+                        return;
                     }
                 }
 
-                self.ui_state.current_screen =
-                    Screen::PerformingReplacement(PerformingReplacementState::new(
-                        background_processing_receiver,
-                        cancelled,
-                        replacements_completed,
-                        total_replacements,
-                    ));
+                self.ui_state.current_screen = Screen::SearchFields(search_fields_state);
             }
             screen => self.ui_state.current_screen = screen,
         }
@@ -1494,7 +1525,13 @@ impl<'a> App {
                 if self.run_config.print_results {
                     EventHandlingResult::new_exit_stats(replace_state)
                 } else {
-                    self.ui_state.current_screen = Screen::Results(replace_state);
+                    // Show results as a dismissable popup instead of switching screen
+                    if let Screen::SearchFields(ref mut search_fields_state) =
+                        self.ui_state.current_screen
+                    {
+                        search_fields_state.replacement_progress = None;
+                    }
+                    self.ui_state.popup = Some(Popup::ReplacementResults(replace_state));
                     EventHandlingResult::Rerender
                 }
             }
@@ -1898,6 +1935,11 @@ impl<'a> App {
 
         match &mut self.ui_state.current_screen {
             Screen::SearchFields(search_fields_state) => {
+                // If replacement is in progress, ignore all keys (quit handled above)
+                if search_fields_state.replacement_progress.is_some() {
+                    return EventHandlingResult::None;
+                }
+
                 let Command::SearchFields(command) = command else {
                     panic!("Expected SearchFields command, found {command:?}");
                 };
@@ -1961,10 +2003,12 @@ impl<'a> App {
                     }
                 }
             }
+            // These screens are no longer used — replacement progress is shown inline
+            // on SearchFields, and results are shown as a popup. Kept for compatibility.
             Screen::PerformingReplacement(_) => EventHandlingResult::None,
             Screen::Results(replace_state) => {
                 let Command::Results(command) = command else {
-                    panic!("Expected SearchFields event, found {command:?}");
+                    panic!("Expected Results command, found {command:?}");
                 };
                 replace_state.handle_command_results(command)
             }
@@ -2266,7 +2310,11 @@ impl<'a> App {
 
         let current_screen_keys = match &self.ui_state.current_screen {
             Screen::SearchFields(search_fields_state) => {
-                let mut keys = vec![];
+                // During inline replacement progress, show minimal keymaps
+                if search_fields_state.replacement_progress.is_some() {
+                    vec![keymap!(general.quit, "quit", Show::Both)]
+                } else {
+                    let mut keys = vec![];
                 match search_fields_state.focussed_section {
                     FocussedSection::SearchFields => {
                         keys.extend([
@@ -2380,6 +2428,7 @@ impl<'a> App {
                     Show::FullOnly,
                 ));
                 keys
+                } // end of else (non-replacement-progress)
             }
             Screen::PerformingReplacement(_) => vec![],
             Screen::Results(replace_state) => {

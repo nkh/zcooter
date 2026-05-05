@@ -11,7 +11,7 @@ use scooter_core::{
     app::{App, Event, FocussedSection, InputSource, Popup, Screen, SearchPhase, SearchState},
     diff::{Diff, DiffColour, line_diff},
     errors::AppError,
-    fields::{Field, NUM_SEARCH_FIELDS, SearchField, SearchFields},
+    fields::{Field, SearchField, SearchFields},
     replace::{PerformingReplacementState, ReplaceState},
     search,
     utils::{
@@ -1757,6 +1757,115 @@ fn center(area: Rect, horizontal: Constraint, vertical: Constraint) -> Rect {
     area
 }
 
+fn render_replacement_progress_banner(
+    frame: &mut Frame<'_>,
+    area: Rect,
+    state: &PerformingReplacementState,
+) {
+    let banner_width = 50.min(area.width.saturating_sub(4));
+    let banner_area = center(
+        area,
+        Constraint::Length(banner_width),
+        Constraint::Length(4),
+    );
+
+    frame.render_widget(Clear, banner_area);
+
+    let num_completed = state.num_replacements_completed.load(Ordering::Relaxed);
+    let time_taken = state.replacement_started.elapsed();
+
+    #[allow(clippy::cast_precision_loss)]
+    let progress_text = format!(
+        "Replacing... {}/{} ({:.2}%)\nTime: {}",
+        num_completed,
+        state.total_replacements,
+        (num_completed as f64) / (state.total_replacements.max(1) as f64) * 100.0,
+        display_duration(time_taken)
+    );
+
+    let block = Block::bordered()
+        .border_style(Style::default().fg(Color::Blue))
+        .title(Span::styled(
+            "Replacement in progress",
+            Style::default().fg(Color::Blue).bold(),
+        ));
+
+    frame.render_widget(
+        Paragraph::new(progress_text)
+            .block(block)
+            .alignment(Alignment::Center)
+            .style(Style::default().fg(Color::Blue)),
+        banner_area,
+    );
+}
+
+fn render_replacement_results_popup(
+    replace_state: &ReplaceState,
+    frame: &mut Frame<'_>,
+    area: Rect,
+) {
+    let popup_width = 56.min(area.width.saturating_sub(4));
+    let popup_height = 11.min(area.height.saturating_sub(2));
+    let popup_area = center(
+        area,
+        Constraint::Length(popup_width),
+        Constraint::Length(popup_height),
+    );
+
+    frame.render_widget(Clear, popup_area);
+
+    let has_errors = !replace_state.errors.is_empty();
+    let title = if has_errors {
+        "Replacement Complete (with errors)"
+    } else {
+        "Replacement Complete"
+    };
+
+    let success_color = if has_errors {
+        Color::Yellow
+    } else {
+        Color::Green
+    };
+
+    let content: Vec<Line<'_>> = vec![
+        Line::from(""),
+        Line::from(vec![
+            Span::raw("  Successful: "),
+            Span::styled(
+                replace_state.num_successes.to_string(),
+                Style::default().fg(success_color),
+            ),
+            Span::raw(" lines"),
+        ]),
+        Line::from(vec![
+            Span::raw("  Ignored:    "),
+            Span::styled(
+                replace_state.num_ignored.to_string(),
+                Style::default().fg(Color::Blue),
+            ),
+            Span::raw(" lines"),
+        ]),
+        Line::from(vec![
+            Span::raw("  Errors:     "),
+            Span::styled(
+                replace_state.errors.len().to_string(),
+                if has_errors {
+                    Style::default().fg(Color::Red)
+                } else {
+                    Style::default()
+                },
+            ),
+        ]),
+        Line::from(""),
+        Line::from(Span::styled(
+            "  Press any key to continue",
+            Style::default().fg(Color::Blue),
+        )),
+    ];
+
+    render_paragraph_popup(title, content, frame, popup_area);
+}
+
 fn render_performing_replacement_view(
     frame: &mut Frame<'_>,
     area: Rect,
@@ -1833,10 +1942,11 @@ pub fn render(app: &mut App, frame: &mut Frame<'_>) {
     let show_popup = app.show_popup();
     match &mut app.ui_state.current_screen {
         Screen::SearchFields(search_fields_state) => {
-            let num_search_fields_to_render = match search_fields_state.focussed_section {
-                FocussedSection::SearchFields => NUM_SEARCH_FIELDS,
-                FocussedSection::SearchResults => NUM_SEARCH_FIELDS_TRUNCATED,
-            };
+            let has_replacement_progress = search_fields_state.replacement_progress.is_some();
+
+            // Always show the compact layout: 2 fields + results + preview
+            // No layout shift based on focus — the base layout is always the same
+            let num_search_fields_to_render = NUM_SEARCH_FIELDS_TRUNCATED;
             let area = default_width(content_area);
             let [fields, _, results] = Layout::vertical([
                 Constraint::Length(num_search_fields_to_render * SEARCH_FIELD_HEIGHT),
@@ -1858,7 +1968,13 @@ pub fn render(app: &mut App, frame: &mut Frame<'_>) {
 
             let replacements_in_progress = search_fields_state.replacements_in_progress();
             let search_is_empty = app.search_fields.search().text().is_empty();
-            if let Some(state) = &mut search_fields_state.search_state {
+
+            if has_replacement_progress {
+                // Show replacement progress as a centered banner instead of full screen
+                if let Some(ref progress_state) = search_fields_state.replacement_progress {
+                    render_replacement_progress_banner(frame, results, progress_state);
+                }
+            } else if let Some(state) = &mut search_fields_state.search_state {
                 // Invariant held by `enter_chars_into_field` /
                 // `perform_search_already_validated`: whenever `search_state`
                 // is `Some`, the search text is non-empty.
@@ -1879,9 +1995,11 @@ pub fn render(app: &mut App, frame: &mut Frame<'_>) {
             }
         }
         Screen::PerformingReplacement(state) => {
+            // Legacy fallback — should not be reached with the unified UI
             render_performing_replacement_view(frame, content_area, state);
         }
         Screen::Results(replace_state) => {
+            // Legacy fallback — should not be reached with the unified UI
             render_results_view(frame, replace_state, content_area);
         }
     }
@@ -1892,7 +2010,9 @@ pub fn render(app: &mut App, frame: &mut Frame<'_>) {
         Some(Popup::Text { title, body }) => {
             render_text_popup(title, body, frame, content_area);
         }
-
+        Some(Popup::ReplacementResults(replace_state)) => {
+            render_replacement_results_popup(replace_state, frame, content_area);
+        }
         None => {}
     }
 
