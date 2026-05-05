@@ -772,6 +772,9 @@ pub struct App {
     pub event_channels: EventChannels,
     pub ui_state: UIState,
     file_content_provider: Arc<dyn FileContentProvider>,
+    /// Set to true when UI-level caches (file windows, diffs) should be cleared.
+    /// The frontend checks and resets this flag.
+    ui_caches_invalidated: bool,
 }
 
 impl std::fmt::Debug for App {
@@ -1119,6 +1122,7 @@ impl<'a> App {
             event_channels: EventChannels::new(),
             ui_state: UIState::new(Screen::SearchFields(search_fields_state)),
             file_content_provider: default_file_content_provider(),
+            ui_caches_invalidated: false,
         };
 
         if search_immediately {
@@ -1130,6 +1134,16 @@ impl<'a> App {
 
     pub fn set_file_content_provider(&mut self, provider: Arc<dyn FileContentProvider>) {
         self.file_content_provider = provider;
+    }
+
+    /// Returns true if UI-level caches should be cleared, resetting the flag.
+    /// The frontend should call this before each draw and clear caches if true.
+    pub fn take_ui_cache_clear_request(&mut self) -> bool {
+        std::mem::take(&mut self.ui_caches_invalidated)
+    }
+
+    fn request_ui_cache_clear(&mut self) {
+        self.ui_caches_invalidated = true;
     }
 
     fn replacement_context<'b>(
@@ -1234,6 +1248,7 @@ impl<'a> App {
     /// changes are picked up and stale results are replaced.
     pub fn refresh_after_editor(&mut self, edited_path: &Path) {
         self.file_content_provider.invalidate(edited_path);
+        self.request_ui_cache_clear();
         self.perform_search_background();
     }
 
@@ -1626,16 +1641,7 @@ impl<'a> App {
                 if self.run_config.print_results {
                     EventHandlingResult::new_exit_stats(replace_state)
                 } else {
-                    // Reset focus to search fields and clear search state
-                    if let Screen::SearchFields(ref mut search_fields_state) =
-                        self.ui_state.current_screen
-                    {
-                        search_fields_state.replacement_progress = None;
-                        search_fields_state.focussed_section = FocussedSection::SearchFields;
-                        search_fields_state.search_state = None;
-                        search_fields_state.cancel_pending_async_work();
-                    }
-                    // Show replacement result as a toast
+                    // Build the toast message before resetting (reset clears state)
                     let file_word = if replace_state.num_files == 1 {
                         "file"
                     } else {
@@ -1660,6 +1666,12 @@ impl<'a> App {
                             if replace_state.errors.len() == 1 { "" } else { "s" },
                         )
                     };
+
+                    // Full reset: clears search text, replacement text, results, caches
+                    self.reset();
+                    // Request UI cache clear so stale file windows are evicted
+                    self.request_ui_cache_clear();
+                    // Show toast on the fresh app
                     self.show_toast(message, Duration::from_secs(4));
                     EventHandlingResult::Rerender
                 }

@@ -34,6 +34,13 @@ macro_rules! define_cache {
                     Mutex::new(LruCache::new(cache_capacity))
                 })
             }
+
+            pub(crate) fn [<$fn_name _clear>]() {
+                if let Some(cache) = [<$fn_name:upper _CACHE>].get() {
+                    let mut guard = cache.lock().unwrap();
+                    guard.clear();
+                }
+            }
         }
     };
 }
@@ -87,4 +94,13 @@ pub(crate) fn diff_cache_hash(old: &MatchContent, replacement: &str) -> u64 {
     old.hash(&mut hasher);
     replacement.hash(&mut hasher);
     hasher.finish()
+}
+
+/// Clear all UI-level caches. Called after external edits or replacements
+/// so that stale file content is never served from cache.
+pub fn clear_caches() {
+    plain_window_cache_clear();
+    highlighted_window_cache_clear();
+    highlighted_file_cache_clear();
+    diff_cache_clear();
 }

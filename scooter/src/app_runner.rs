@@ -333,6 +333,10 @@ where
     }
 
     pub fn draw(&mut self) -> anyhow::Result<()> {
+        // Clear UI caches if the backend requested it (after edits/replacements)
+        if self.app.take_ui_cache_clear_request() {
+            crate::ui::cache::clear_caches();
+        }
         self.tui.draw(&mut self.app)?;
         self.snapshot_provider.send_snapshot(&self.tui);
         Ok(())
