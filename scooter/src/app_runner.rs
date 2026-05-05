@@ -357,10 +357,14 @@ where
                         Event::LaunchEditor((file_path, line)) => {
                             let mut res = EventHandlingResult::Rerender;
                             self.tui.show_cursor()?;
-                            match self.open_editor(file_path, line) {
+                            match self.open_editor(file_path.clone(), line) {
                                 Ok(()) => {
                                     if self.app.config.editor_open.exit {
                                         res = EventHandlingResult::Exit(None);
+                                    } else {
+                                        // Re-search so stale results are replaced
+                                        // with up-to-date matches for the edited file
+                                        self.app.refresh_after_editor(&file_path);
                                     }
                                 }
                                 Err(e) => {

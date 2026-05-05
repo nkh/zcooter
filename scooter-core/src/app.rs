@@ -1229,6 +1229,14 @@ impl<'a> App {
         self.file_content_provider = provider;
     }
 
+    /// Re-run the current search from scratch, invalidating file caches.
+    /// Called after returning from an external editor so that any file
+    /// changes are picked up and stale results are replaced.
+    pub fn refresh_after_editor(&mut self, edited_path: &Path) {
+        self.file_content_provider.invalidate(edited_path);
+        self.perform_search_background();
+    }
+
     pub async fn event_recv(&mut self) -> Event {
         tokio::select! {
             Some(event) = self.event_channels.recv() => event,
