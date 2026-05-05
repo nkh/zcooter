@@ -45,126 +45,94 @@ use crate::ui::cache::{self, FileWindow};
 
 use super::colour::to_ratatui_colour;
 
-fn create_title_spans<'a>(
-    field: &SearchField,
-    title: &'a str,
-    highlighted: bool,
-    set_by_cli: bool,
-    disable_prepopulated_fields: bool,
-) -> Vec<Span<'a>> {
-    let mut fg_color = Color::Reset;
-    if set_by_cli && disable_prepopulated_fields {
-        fg_color = Color::Blue;
-    } else if highlighted {
-        fg_color = Color::Green;
-    }
-    let title_style = Style::new().fg(fg_color);
+/// Compact single-line field height (for inline label:value display)
+#[allow(dead_code)]
+static COMPACT_FIELD_HEIGHT: u16 = 1;
 
-    let mut spans = vec![Span::styled(title, title_style)];
-    if let Some(error) = field.error() {
-        spans.push(Span::styled(
-            format!(" (Error: {})", error.short),
-            Style::new().fg(Color::Red),
-        ));
-    }
-    spans
-}
-
-pub fn render_search_field(
-    field: &SearchField,
-    frame: &mut Frame<'_>,
-    area: Rect,
-    highlighted: bool,
-    disable_prepopulated_fields: bool,
-) {
-    let mut block = Block::bordered();
-    if field.set_by_cli && disable_prepopulated_fields {
-        block = block.border_style(Style::new().blue());
-    } else if highlighted {
-        block = block.border_style(Style::new().green());
-    }
-
-    let title_spans = create_title_spans(
-        field,
-        field.name.title(),
-        highlighted,
-        field.set_by_cli,
-        disable_prepopulated_fields,
-    );
-
-    match &field.field {
-        Field::Text(f) => {
-            block = block.title(Line::from(title_spans));
-            frame.render_widget(Paragraph::new(f.text()).block(block), area);
-        }
-        Field::Checkbox(f) => {
-            let inner_chunks = Layout::default()
-                .direction(Direction::Horizontal)
-                .constraints([Constraint::Length(5), Constraint::Min(0)])
-                .split(area);
-
-            frame.render_widget(
-                Paragraph::new(if f.checked { " X " } else { "" }).block(block),
-                inner_chunks[0],
-            );
-
-            let mut spans = vec![Span::raw(" ")];
-            spans.extend(title_spans);
-
-            let checkbox_text = vec![Line::from(Span::raw("")), Line::from(spans)];
-
-            frame.render_widget(Paragraph::new(checkbox_text), inner_chunks[1]);
-        }
-    }
-}
-
-static SEARCH_FIELD_HEIGHT: u16 = 3;
-static NUM_SEARCH_FIELDS_TRUNCATED: u16 = 2;
-
-fn render_search_fields(
+fn render_compact_search_fields(
     frame: &mut Frame<'_>,
     search_fields: &SearchFields,
     config: &Config,
     show_popup: bool,
-    num_search_fields_to_render: u16,
     is_focussed: bool,
     area: Rect,
 ) {
-    let areas = Layout::vertical(iter::repeat_n(
-        Constraint::Length(SEARCH_FIELD_HEIGHT),
-        num_search_fields_to_render as usize,
-    ))
-    .flex(Flex::Center)
-    .split(area);
+    for (idx, field) in search_fields.fields.iter().enumerate() {
+        let highlighted = is_focussed && idx == search_fields.highlighted;
+        let y = area.y + idx as u16;
+        if y >= area.y + area.height {
+            break;
+        }
+        let field_area = Rect {
+            x: area.x,
+            y,
+            width: area.width,
+            height: 1,
+        };
 
-    search_fields
-        .fields
-        .iter()
-        .zip(areas.iter())
-        .enumerate()
-        .for_each(|(idx, (search_field, &field_area))| {
-            render_search_field(
-                search_field,
-                frame,
-                field_area,
-                is_focussed && idx == search_fields.highlighted,
-                config.search.disable_prepopulated_fields,
-            );
-        });
-
-    if is_focussed && !show_popup {
-        let field = search_fields.highlighted_field();
-        if !(field.set_by_cli && config.search.disable_prepopulated_fields)
-            && let Some(cursor_pos) = field.cursor_pos()
+        let label_style = if field.set_by_cli && config.search.disable_prepopulated_fields
         {
-            let highlighted_area = areas[search_fields.highlighted];
+            Style::new().fg(Color::Blue)
+        } else if highlighted {
+            Style::new().fg(Color::Green)
+        } else {
+            Style::new().fg(Color::Reset)
+        };
 
-            frame.set_cursor_position(Position {
-                x: highlighted_area.x + u16::try_from(cursor_pos).unwrap_or(0) + 1,
-                y: highlighted_area.y + 1,
-            });
+        // Build label name
+        let label = field.name.title();
+
+        match &field.field {
+            Field::Text(f) => {
+                let text = f.text();
+                let label_line = format!("{label}: ");
+                let label_len = UnicodeWidthStr::width(label_line.as_str());
+
+                let mut spans = vec![Span::styled(label_line, label_style)];
+                if !text.is_empty() {
+                    spans.push(Span::raw(text.to_string()));
+                } else if highlighted {
+                    spans.push(Span::raw("").style(Style::default()));
+                }
+
+                frame.render_widget(Line::from(spans), field_area);
+
+                // Show cursor for focused text field
+                if highlighted && !show_popup {
+                    if !(field.set_by_cli && config.search.disable_prepopulated_fields) {
+                        if let Some(cursor_pos) = field.cursor_pos() {
+                            frame.set_cursor_position(Position {
+                                x: field_area.x
+                                    + u16::try_from(label_len).unwrap_or(0)
+                                    + u16::try_from(cursor_pos).unwrap_or(0),
+                                y: field_area.y,
+                            });
+                        }
+                    }
+                }
+            }
+            Field::Checkbox(f) => {
+                let checked_marker = if f.checked { " X" } else { "  " };
+                let text = format!("{checked_marker} {label}");
+                let spans = vec![Span::styled(text, label_style)];
+                frame.render_widget(Line::from(spans), field_area);
+            }
         }
     }
+}
+
+// Legacy boxed field rendering — kept for reference but no longer used
+#[allow(dead_code)]
+fn render_search_fields_boxed(
+    frame: &mut Frame<'_>,
+    _search_fields: &SearchFields,
+    _config: &Config,
+    _show_popup: bool,
+    _num_search_fields_to_render: u16,
+    _is_focussed: bool,
+    _area: Rect,
+) {
+    // This function is kept for reference but not called in the compact UI
 }
 
 fn default_width(area: Rect) -> Rect {
@@ -281,10 +249,9 @@ fn render_search_results(
 ) {
     let small_screen = area.width <= 110;
 
-    let [num_results_area, results_area, _] = Layout::vertical([
-        Constraint::Length(2),
-        Constraint::Fill(1),
+    let [num_results_area, results_area] = Layout::vertical([
         Constraint::Length(1),
+        Constraint::Fill(1),
     ])
     .flex(Flex::Start)
     .areas(area);
@@ -325,18 +292,16 @@ fn render_search_results(
     }
 
     let (list_area, preview_area) = if small_screen {
-        let [list_area, _, preview_area] = Layout::vertical([
+        let [list_area, preview_area] = Layout::vertical([
             #[allow(clippy::cast_possible_truncation)]
             Constraint::Length(num_to_render as u16),
-            Constraint::Length(1),
             Constraint::Fill(1),
         ])
         .areas(results_area);
         (list_area, preview_area)
     } else {
-        let [list_area, _, preview_area] = Layout::horizontal([
+        let [list_area, preview_area] = Layout::horizontal([
             Constraint::Fill(2),
-            Constraint::Length(1),
             Constraint::Fill(3),
         ])
         .areas(results_area);
@@ -411,7 +376,7 @@ fn render_empty_search_banner(
     num_replacements_updates_in_progress: Option<(usize, usize)>,
 ) {
     let [num_results_area, _] =
-        Layout::vertical([Constraint::Length(2), Constraint::Fill(1)]).areas(area);
+        Layout::vertical([Constraint::Length(1), Constraint::Fill(1)]).areas(area);
     render_num_results(
         frame,
         num_results_area,
@@ -432,14 +397,14 @@ fn render_num_results(
 ) {
     let left_content_1 = format!("Results: {num_results}");
     let (left_content_2, accessory_colour) = match status {
-        BannerStatus::Empty => (" [Search is empty]", Color::Red),
-        BannerStatus::Invalid => (" [Invalid search]", Color::Red),
-        BannerStatus::InProgress => (" [Still searching...]", Color::Blue),
-        BannerStatus::Complete => (" [Search complete]", Color::Green),
+        BannerStatus::Empty => (" [empty]", Color::Red),
+        BannerStatus::Invalid => (" [invalid]", Color::Red),
+        BannerStatus::InProgress => (" [searching...]", Color::Blue),
+        BannerStatus::Complete => (" [done]", Color::Green),
     };
     let mid_content = preview_update_status(num_replacements_updates_in_progress);
     let right_content = time_taken
-        .map(|t| format!(" [Time taken: {}]", display_duration(t)))
+        .map(|t| format!(" [{:.1}s]", display_duration(t)))
         .unwrap_or_default();
     let num_total_spacers = (area.width as usize).saturating_sub(
         left_content_1.len() + left_content_2.len() + mid_content.len() + right_content.len(),
@@ -1618,7 +1583,11 @@ fn file_path_line<'a>(
             .fg(Color::Indexed(255));
     }
 
-    let right_content = format!(" ({})", idx + 1);
+    let right_content = if result.search_result.included {
+        " *".to_string()
+    } else {
+        String::new()
+    };
     let right_content_len = right_content.chars().count();
     let left_content = format!(
         "[{}] ",
@@ -1919,70 +1888,46 @@ fn error_result(result: &SearchResultWithReplacement) -> [ratatui::widgets::List
 }
 
 pub fn render(app: &mut App, frame: &mut Frame<'_>) {
-    let chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Length(1),
-            Constraint::Min(1),
-            Constraint::Length(1),
-        ])
-        .split(frame.area());
-    let [header_area, content_area, footer_area] = chunks[..] else {
-        panic!("Unexpected chunks length {}", chunks.len())
-    };
-
-    let title_block = Block::default().style(Style::default());
-    let title = Paragraph::new(Text::styled("scooter", Style::new().fg(Color::Blue)))
-        .block(title_block)
-        .alignment(Alignment::Center);
-    frame.render_widget(title, header_area);
-
-    render_key_hints(app, frame, footer_area);
+    // Use full terminal width — no header, no footer, no wasted space
+    let content_area = frame.area();
 
     let show_popup = app.show_popup();
     match &mut app.ui_state.current_screen {
         Screen::SearchFields(search_fields_state) => {
             let has_replacement_progress = search_fields_state.replacement_progress.is_some();
+            let fields_focussed = search_fields_state.focussed_section == FocussedSection::SearchFields;
 
-            // Always show the compact layout: 2 fields + results + preview
-            // No layout shift based on focus — the base layout is always the same
-            let num_search_fields_to_render = NUM_SEARCH_FIELDS_TRUNCATED;
-            let area = default_width(content_area);
-            let [fields, _, results] = Layout::vertical([
-                Constraint::Length(num_search_fields_to_render * SEARCH_FIELD_HEIGHT),
-                Constraint::Length(1),
+            // Compact layout: single-line fields (no boxes) + results + preview
+            let num_fields = app.search_fields.fields.len();
+            let fields_height = num_fields as u16;
+            let [fields_area, results_area] = Layout::vertical([
+                Constraint::Length(fields_height),
                 Constraint::Fill(1),
             ])
-            .flex(Flex::Center)
-            .areas(area);
+            .areas(content_area);
 
-            render_search_fields(
+            render_compact_search_fields(
                 frame,
                 &app.search_fields,
                 &app.config,
                 show_popup,
-                num_search_fields_to_render,
-                search_fields_state.focussed_section == FocussedSection::SearchFields,
-                fields,
+                fields_focussed,
+                fields_area,
             );
 
             let replacements_in_progress = search_fields_state.replacements_in_progress();
             let search_is_empty = app.search_fields.search().text().is_empty();
 
             if has_replacement_progress {
-                // Show replacement progress as a centered banner instead of full screen
                 if let Some(ref progress_state) = search_fields_state.replacement_progress {
-                    render_replacement_progress_banner(frame, results, progress_state);
+                    render_replacement_progress_banner(frame, results_area, progress_state);
                 }
             } else if let Some(state) = &mut search_fields_state.search_state {
-                // Invariant held by `enter_chars_into_field` /
-                // `perform_search_already_validated`: whenever `search_state`
-                // is `Some`, the search text is non-empty.
                 render_search_results(
                     frame,
                     &app.input_source,
                     state,
-                    results,
+                    results_area,
                     app.config.get_theme(),
                     app.config.style.true_color,
                     app.event_channels.sender.clone(),
@@ -1991,15 +1936,13 @@ pub fn render(app: &mut App, frame: &mut Frame<'_>) {
                     app.config.preview.wrap_text,
                 );
             } else if search_is_empty {
-                render_empty_search_banner(frame, results, replacements_in_progress);
+                render_empty_search_banner(frame, results_area, replacements_in_progress);
             }
         }
         Screen::PerformingReplacement(state) => {
-            // Legacy fallback — should not be reached with the unified UI
             render_performing_replacement_view(frame, content_area, state);
         }
         Screen::Results(replace_state) => {
-            // Legacy fallback — should not be reached with the unified UI
             render_results_view(frame, replace_state, content_area);
         }
     }
@@ -2056,6 +1999,7 @@ fn render_text_popup(title: &str, body: &str, frame: &mut Frame<'_>, area: Rect)
     render_paragraph_popup(title, lines, frame, area);
 }
 
+#[allow(dead_code)]
 fn render_key_hints(app: &App, frame: &mut Frame<'_>, chunk: Rect) {
     let keys_hint = Span::styled(
         app.keymaps_compact()
