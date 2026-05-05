@@ -547,7 +547,8 @@ pub struct SearchFieldsState {
     /// switching to a separate screen.
     pub replacement_progress: Option<PerformingReplacementState>,
     /// Width of the file name column as a percentage of the results area (10–80).
-    /// Adjustable at runtime with Ctrl+Left / Ctrl+Right. Default is 33 (≈ 1/3).
+    /// Adjustable at runtime with Ctrl+Left / Ctrl+Right. Default comes from
+    /// `preview.file_column_percentage` in config (25 by default).
     pub file_column_width_pct: u16,
 }
 
@@ -562,7 +563,7 @@ impl Default for SearchFieldsState {
             next_search_generation: 0,
             pending_search_generation: None,
             replacement_progress: None,
-            file_column_width_pct: 33,
+            file_column_width_pct: 25,
         }
     }
 }
@@ -1095,6 +1096,10 @@ impl<'a> App {
         );
 
         let mut search_fields_state = SearchFieldsState::default();
+        search_fields_state.file_column_width_pct = config
+            .preview
+            .file_column_percentage
+            .clamp(10, 80);
         if app_run_config.immediate_search {
             search_fields_state.focussed_section = FocussedSection::SearchResults;
         }
@@ -2177,23 +2182,6 @@ impl<'a> App {
                 }
             }
 
-            // Ctrl+Up / Ctrl+Down: jump to previous / next file
-            if key_event.code == KeyCode::Up || key_event.code == KeyCode::Down {
-                if let Some(state) = self.get_search_state_if_results() {
-                    if key_event.code == KeyCode::Up {
-                        state.move_to_prev_file();
-                    } else {
-                        state.move_to_next_file();
-                    }
-                    let sfs = self
-                        .ui_state
-                        .current_screen
-                        .unwrap_search_fields_state_mut();
-                    sfs.focussed_section = FocussedSection::SearchResults;
-                    return Right(EventHandlingResult::Rerender);
-                }
-            }
-
             // Ctrl+Left / Ctrl+Right: resize file name column
             if key_event.code == KeyCode::Left || key_event.code == KeyCode::Right {
                 if let Screen::SearchFields(ref mut sfs) = self.ui_state.current_screen {
@@ -2867,10 +2855,8 @@ impl<'a> App {
             k.push(("<C-t>".to_string(), "focus fixed toggle", Show::FullOnly));
             // Toggle all (hard-coded)
             k.push(("<C-w>".to_string(), "toggle all", Show::FullOnly));
-            // File navigation (Ctrl+Up/Down)
+            // Column resize (hard-coded)
             if on_search_results {
-                k.push(("<C-up>".to_string(), "prev file", Show::FullOnly));
-                k.push(("<C-down>".to_string(), "next file", Show::FullOnly));
                 k.push(("<C-left>".to_string(), "narrow file column", Show::FullOnly));
                 k.push(("<C-right>".to_string(), "widen file column", Show::FullOnly));
             }

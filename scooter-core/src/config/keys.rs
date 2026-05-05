@@ -216,9 +216,9 @@ pub struct KeysSearchFocusResults {
     pub move_down: Keys,
     /// Navigate to the search result above (wraps to bottom at top)
     pub move_up: Keys,
-    /// Navigate to the next file (first match in next file). Default: Ctrl+Down (hard-coded)
+    /// Navigate to the next file (first match in next file)
     pub move_next_file: Keys,
-    /// Navigate to the previous file (first match in previous file). Default: Ctrl+Up (hard-coded)
+    /// Navigate to the previous file (first match in previous file)
     pub move_prev_file: Keys,
     /// Navigate to the search result half a page below
     pub move_down_half_page: Keys,
@@ -264,8 +264,8 @@ impl Default for KeysSearchFocusResults {
                 KeyEvent::new(KeyCode::Char('p'), KeyModifiers::CONTROL),
                 KeyEvent::new(KeyCode::Up, KeyModifiers::NONE),
             ],
-            move_next_file: keys![],
-            move_prev_file: keys![],
+            move_next_file: keys![KeyEvent::new(KeyCode::Down, KeyModifiers::CONTROL)],
+            move_prev_file: keys![KeyEvent::new(KeyCode::Up, KeyModifiers::CONTROL)],
             move_down_half_page: keys![KeyEvent::new(KeyCode::Char('d'), KeyModifiers::CONTROL)],
             move_down_full_page: keys![
                 KeyEvent::new(KeyCode::Char('f'), KeyModifiers::CONTROL),

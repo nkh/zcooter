@@ -204,11 +204,23 @@ fn parse_overrides<H: ValidationErrorHandler>(
     let mut overrides = OverrideBuilder::new(&dir_config.directory);
     let mut success = true;
 
-    if let Some(include_globs) = dir_config.include_globs
-        && let Err(e) = utils::add_overrides(&mut overrides, include_globs, "")
-    {
-        error_handler.handle_include_files_error("Couldn't parse glob pattern", &e.to_string());
-        success = false;
+    if let Some(include_globs) = dir_config.include_globs {
+        if !include_globs.trim().is_empty() {
+            // Add a catch-all ignore first so that only files matching the
+            // include patterns are visited. Include patterns added after
+            // this take precedence (last matching rule wins).
+            if let Err(e) = overrides.add("!*") {
+                error_handler.handle_include_files_error(
+                    "Couldn't parse glob pattern",
+                    &e.to_string(),
+                );
+                success = false;
+            }
+        }
+        if let Err(e) = utils::add_overrides(&mut overrides, include_globs, "") {
+            error_handler.handle_include_files_error("Couldn't parse glob pattern", &e.to_string());
+            success = false;
+        }
     }
     if let Some(exclude_globs) = dir_config.exclude_globs
         && let Err(e) = utils::add_overrides(&mut overrides, exclude_globs, "!")

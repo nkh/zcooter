@@ -279,6 +279,12 @@ and then set `syntax_highlighting_theme = "Catppuccin Macchiato"`.
 
 Wrap text onto the next line if it is wider than the preview window. Defaults to `false`. (Can be toggled in the UI using `ctrl+l`.)
 
+#### `file_column_percentage`
+
+Width of the file name column as a percentage of the results area (10–80).
+The preview takes the remaining space. Defaults to `25` (i.e. preview is 75%).
+Adjustable at runtime with Ctrl+Left / Ctrl+Right.
+
 ### `[style]` section
 
 #### `true_color`
@@ -330,8 +336,10 @@ focus_previous_field = "S-tab"      # Focus on the previous field
 trigger_replacement = "enter"              # Trigger a replacement
 back_to_fields = ["esc", "C-o"]            # Move focus back to the search fields
 open_in_editor = "e"                       # Open the currently selected search result in your editor. The editor command can be overriden using the `editor_open` section of your config.
-move_down = ["j", "down", "C-n"]           # Navigate to the search result below
-move_up = ["k", "up", "C-p"]               # Navigate to the search result above
+move_down = ["j", "C-n", "down"]           # Navigate to the search result below (wraps to top at end)
+move_up = ["k", "C-p", "up"]               # Navigate to the search result above (wraps to bottom at top)
+move_next_file = "C-down"                  # Navigate to the next file (first match in next file)
+move_prev_file = "C-up"                    # Navigate to the previous file (first match in previous file)
 move_down_half_page = "C-d"                # Navigate to the search result half a page below
 move_up_half_page = "C-u"                  # Navigate to the search result half a page above
 move_down_full_page = ["C-f", "pagedown"]  # Navigate to the search result a page below
@@ -339,7 +347,7 @@ move_up_full_page = ["C-b", "pageup"]      # Navigate to the search result a pag
 move_top = "g"                             # Navigate to the first search result
 move_bottom = "G"                          # Navigate to the last search result
 toggle_selected_inclusion = "space"        # Toggle whether the currently highlighted result will be replaced or ignored
-toggle_all_selected = "C-g"               # Toggle whether all results will be replaced or ignored
+toggle_all_selected = "C-w"                # Toggle whether all results will be replaced or ignored
 toggle_multiselect_mode = "v"              # Toggle whether multiselect mode is enabled
 flip_multiselect_direction = "A-;"         # Flip the direction of the multiselect selection
 
@@ -421,6 +429,34 @@ exit = true
 #### Piping to scooter
 
 You can pipe content from Helix to scooter, and it will write the updated contents back to the buffer in Helix. Select some contents in Helix, and then enter `:| scooter --print-on-exit >/dev/tty` (i.e. press `:`, type or paste `| scooter --print-on-exit >/dev/tty`, and then press enter). scooter will open, allowing you to find and replace on the contents: once you're done, the buffer will have been updated with any changes.
+
+### Vim / Neovim (terminal mode)
+
+You can use Vim's terminal mode to run scooter within a split or popup. Here are some useful mappings:
+
+```vim
+" Open scooter in a vertical split
+nnoremap <leader>s :vertical terminal scooter<CR>
+
+" Open scooter for the current file
+nnoremap <leader>f :vertical terminal scooter %<CR>
+
+" Open scooter for all files in the current git repo
+nnoremap <leader>a :vertical terminal scooter $(git rev-parse --show-toplevel)<CR>
+
+" Open scooter with visual selection as the search text
+vnoremap <leader>r y:vertical terminal scooter --fixed-strings --search-text <C-R>"<CR>
+```
+
+For `:terminal scooter %`, the `%` expands to the current file path in Vim/Neovim. If you're using Neovim, you may prefer the [ToggleTerm](#option-2-using-toggleterm) or [snacks.nvim](#option-1-using-snacksnvim) integration above, which provides a floating window experience.
+
+To open files from scooter back in Vim, add the following to your [scooter config file](#configuration-options):
+
+```toml
+[editor_open]
+command = "vim +%line %file"
+exit = true
+```
 
 ### Neovim
 

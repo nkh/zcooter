@@ -167,7 +167,7 @@ fn render_compact_search_fields(
                 let count_str: String = match search_phase {
                     Some(SearchPhase::Running { .. }) => "searching..".to_string(),
                     Some(SearchPhase::Invalid) => "[invalid]".to_string(),
-                    Some(SearchPhase::Complete { .. }) if num_results > 0 => {
+                    Some(SearchPhase::Complete { .. }) => {
                         format!("({num_results:>6})")
                     }
                     _ => String::new(),
@@ -175,9 +175,11 @@ fn render_compact_search_fields(
                 let count_style = match search_phase {
                     Some(SearchPhase::Running { .. }) => Style::new().fg(Color::Blue),
                     Some(SearchPhase::Invalid) => Style::new().fg(Color::Red),
+                    Some(SearchPhase::Complete { .. }) => Style::new().fg(Color::Reset),
                     _ => Style::new().fg(Color::Reset),
                 };
-                let total_right_width = toggle_width + COUNT_WIDTH;
+                // +1 ensures at least one space between last toggle and count
+                let total_right_width = toggle_width + 1 + COUNT_WIDTH;
                 let used_width: usize = spans.iter().map(|s| UnicodeWidthStr::width(s.content.as_ref())).sum();
                 let spacer_width = area.width.saturating_sub(used_width as u16 + total_right_width as u16) as usize;
                 spans.push(Span::raw(" ".repeat(spacer_width)));

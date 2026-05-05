@@ -127,6 +127,10 @@ pub struct PreviewConfig {
     pub syntax_highlighting_theme: Theme,
     /// Wrap text onto the next line if it is wider than the preview window. Defaults to `false`. (Can be toggled in the UI using `ctrl+l`.)
     pub wrap_text: bool,
+    /// Width of the file name column as a percentage of the results area (10–80).
+    /// The preview takes the remaining space. Defaults to `25` (i.e. preview is 75%).
+    /// Adjustable at runtime with Ctrl+Left / Ctrl+Right.
+    pub file_column_percentage: u16,
 }
 
 impl Default for PreviewConfig {
@@ -135,6 +139,7 @@ impl Default for PreviewConfig {
             syntax_highlighting: true,
             syntax_highlighting_theme: load_theme("base16-eighties.dark").unwrap(),
             wrap_text: false,
+            file_column_percentage: 25,
         }
     }
 }
@@ -322,6 +327,7 @@ interpret_escape_sequences = true
                     syntax_highlighting: false,
                     syntax_highlighting_theme: load_theme("Solarized (light)").unwrap(),
                     wrap_text: true,
+                    file_column_percentage: 25,
                 },
                 style: StyleConfig { true_color: false },
                 search: SearchConfig {
@@ -365,6 +371,7 @@ command = "vim %file +%line"
                 syntax_highlighting: false,
                 syntax_highlighting_theme: load_theme("base16-ocean.dark").unwrap(),
                 wrap_text: false,
+                file_column_percentage: 25,
             },
             style: StyleConfig::default(),
             search: SearchConfig::default(),
@@ -381,6 +388,7 @@ command = "vim %file +%line"
                 syntax_highlighting: true,
                 syntax_highlighting_theme: load_theme("base16-ocean.dark").unwrap(),
                 wrap_text: false,
+                file_column_percentage: 25,
             },
             style: StyleConfig::default(),
             search: SearchConfig::default(),
