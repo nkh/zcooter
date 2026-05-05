@@ -435,20 +435,23 @@ You can pipe content from Helix to scooter, and it will write the updated conten
 You can use Vim's terminal mode to run scooter within a split or popup. Here are some useful mappings:
 
 ```vim
-" Open scooter full screen (split closes automatically when scooter exits)
-nnoremap <leader>s :20split +terminal\|call feedkeys("scooter \<CR>")<CR>
+" Auto-close terminal splits when the process exits
+autocmd TermClose * silent! close
+
+" Open scooter full screen
+nnoremap <leader>s :terminal scooter<CR>
 
 " Open scooter for the current file
-nnoremap <leader>f :20split +terminal\|call feedkeys("scooter % \<CR>")<CR>
+nnoremap <leader>f :terminal scooter %<CR>
 
 " Open scooter for all files in the current git repo
-nnoremap <leader>a :20split +terminal\|call feedkeys("scooter $(git rev-parse --show-toplevel) \<CR>")<CR>
+nnoremap <leader>a :terminal scooter $(git rev-parse --show-toplevel)<CR>
 
 " Open scooter with visual selection as the search text
-vnoremap <leader>r y:20split +terminal\|call feedkeys("scooter --fixed-strings --search-text \<C-R>" \<CR>")<CR>
+vnoremap <leader>r y:terminal scooter --fixed-strings --search-text <C-R>"<CR>
 ```
 
-These use a small horizontal split (`20split`) so your edits stay visible alongside scooter. The terminal split closes automatically as soon as scooter exits, leaving your previous window layout intact. Change `20split` to `split` for a 50/50 split, or remove it for full-screen scooter.
+Add the `autocmd TermClose` line to your vimrc to make terminal splits close automatically when the process exits. The mappings above open scooter in the current window — use `:only | terminal scooter` instead of `:terminal scooter` if you want scooter to take over the full screen (hiding other splits).
 
 For `:terminal scooter %`, the `%` expands to the current file path in Vim/Neovim. If you're using Neovim, you may prefer the [ToggleTerm](#option-2-using-toggleterm) or [snacks.nvim](#snacksnvim) integration above, which provides a floating window experience.
 
