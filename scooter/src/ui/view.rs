@@ -2,7 +2,7 @@ use anyhow::{anyhow, bail};
 use itertools::Itertools;
 use ratatui::{
     Frame,
-    layout::{Alignment, Constraint, Direction, Flex, Layout, Position, Rect},
+    layout::{Alignment, Constraint, Flex, Layout, Position, Rect},
     style::{Color, Style, Stylize},
     text::{Line, Span, Text},
     widgets::{Block, Cell, Clear, List, ListItem, Padding, Paragraph, Row, Table, Wrap},
@@ -11,7 +11,7 @@ use scooter_core::{
     app::{App, Event, FocussedSection, InputSource, Popup, Screen, SearchPhase, SearchState},
     diff::{Diff, DiffColour, line_diff},
     errors::AppError,
-    fields::{Field, SearchField, SearchFields},
+    fields::{Field, SearchFields},
     replace::{PerformingReplacementState, ReplaceState},
     search,
     utils::{
@@ -57,9 +57,17 @@ fn render_compact_search_fields(
     is_focussed: bool,
     area: Rect,
 ) {
-    for (idx, field) in search_fields.fields.iter().enumerate() {
-        let highlighted = is_focussed && idx == search_fields.highlighted;
-        let y = area.y + idx as u16;
+    // Field indices: 0=Search, 1=Replace, 2=FixedStrings, 3=WholeWord, 4=MatchCase, 5=IncludeFiles, 6=ExcludeFiles
+    // Visual layout (4 rows):
+    //   Row 0: Search text: <value>    [X] Fixed strings  [ ] Match whole word  [X] Match case
+    //   Row 1: Replace text: <value>
+    //   Row 2: Files to include: <value>
+    //   Row 3: Files to exclude: <value>
+
+    let num_visual_rows: u16 = 4;
+
+    for visual_row in 0..num_visual_rows {
+        let y = area.y + visual_row;
         if y >= area.y + area.height {
             break;
         }
@@ -70,37 +78,138 @@ fn render_compact_search_fields(
             height: 1,
         };
 
-        let label_style = if field.set_by_cli && config.search.disable_prepopulated_fields
-        {
-            Style::new().fg(Color::Blue)
-        } else if highlighted {
-            Style::new().fg(Color::Green)
-        } else {
-            Style::new().fg(Color::Reset)
-        };
+        match visual_row {
+            // Row 0: Search text + toggle fields inline
+            0 => {
+                let search_field = &search_fields.fields[0];
+                let search_highlighted = is_focussed && search_fields.highlighted == 0;
+                let search_label = "Search text";
+                let search_label_line = format!("{search_label}: ");
+                let search_label_len = UnicodeWidthStr::width(search_label_line.as_str());
 
-        // Build label name
-        let label = field.name.title();
+                let search_label_style = if search_field.set_by_cli
+                    && config.search.disable_prepopulated_fields
+                {
+                    Style::new().fg(Color::Blue)
+                } else if search_highlighted {
+                    Style::new().fg(Color::Green)
+                } else {
+                    Style::new().fg(Color::Reset)
+                };
 
-        match &field.field {
-            Field::Text(f) => {
-                let text = f.text();
-                let label_line = format!("{label}: ");
-                let label_len = UnicodeWidthStr::width(label_line.as_str());
+                let mut spans = vec![Span::styled(search_label_line, search_label_style)];
 
-                let mut spans = vec![Span::styled(label_line, label_style)];
-                if !text.is_empty() {
-                    spans.push(Span::raw(text.to_string()));
-                } else if highlighted {
-                    spans.push(Span::raw("").style(Style::default()));
+                if let Field::Text(f) = &search_field.field {
+                    let text = f.text();
+                    if !text.is_empty() {
+                        // Truncate search text to leave room for toggles
+                        let toggle_area_width: usize = 55; // approx space for 3 toggles
+                        let available = area
+                            .width
+                            .saturating_sub(search_label_len as u16)
+                            .saturating_sub(toggle_area_width as u16) as usize;
+                        let display_text: Cow<'_, str> = if UnicodeWidthStr::width(text) > available {
+                            Cow::Owned(
+                                text.chars()
+                                    .take(available.saturating_sub(1))
+                                    .collect::<String>()
+                                    + "\u{2026}",
+                            )
+                        } else {
+                            Cow::Borrowed(text)
+                        };
+                        spans.push(Span::raw(display_text.to_string()));
+                    } else if search_highlighted {
+                        spans.push(Span::raw("").style(Style::default()));
+                    }
+                }
+
+                // Separator between search value and toggles
+                spans.push(Span::styled("   ", Style::default()));
+
+                // Render 3 toggle fields inline: FixedStrings(idx 2), WholeWord(idx 3), MatchCase(idx 4)
+                for (field_idx, field) in search_fields
+                    .fields
+                    .iter()
+                    .enumerate()
+                    .filter(|(i, _)| *i >= 2 && *i <= 4)
+                {
+                    let highlighted = is_focussed && field_idx == search_fields.highlighted;
+                    let toggle_style = if field.set_by_cli
+                        && config.search.disable_prepopulated_fields
+                    {
+                        Style::new().fg(Color::Blue)
+                    } else if highlighted {
+                        Style::new().fg(Color::Green)
+                    } else {
+                        Style::new().fg(Color::Reset)
+                    };
+
+                    if let Field::Checkbox(f) = &field.field {
+                        let marker = if f.checked { "[X]" } else { "[ ]" };
+                        let label = field.name.title();
+                        spans.push(Span::styled(format!("{marker} {label}"), toggle_style));
+                        spans.push(Span::styled("  ", Style::default()));
+                    }
                 }
 
                 frame.render_widget(Line::from(spans), field_area);
 
-                // Show cursor for focused text field
-                if highlighted && !show_popup {
-                    if !(field.set_by_cli && config.search.disable_prepopulated_fields) {
-                        if let Some(cursor_pos) = field.cursor_pos() {
+                // Cursor for search text field
+                if search_highlighted && !show_popup {
+                    if !(search_field.set_by_cli && config.search.disable_prepopulated_fields) {
+                        if let Field::Text(f) = &search_field.field {
+                            let cursor_pos = f.visual_cursor_pos();
+                            frame.set_cursor_position(Position {
+                                x: field_area.x
+                                    + u16::try_from(search_label_len).unwrap_or(0)
+                                    + u16::try_from(cursor_pos).unwrap_or(0),
+                                y: field_area.y,
+                            });
+                        }
+                    }
+                }
+            }
+            // Rows 1-3: text fields (Replace=1, IncludeFiles=5, ExcludeFiles=6)
+            _ => {
+                let field_idx = match visual_row {
+                    1 => 1, // Replace
+                    2 => 5, // IncludeFiles
+                    3 => 6, // ExcludeFiles
+                    _ => continue,
+                };
+                let field = &search_fields.fields[field_idx];
+                let highlighted = is_focussed && field_idx == search_fields.highlighted;
+
+                let label_style = if field.set_by_cli && config.search.disable_prepopulated_fields
+                {
+                    Style::new().fg(Color::Blue)
+                } else if highlighted {
+                    Style::new().fg(Color::Green)
+                } else {
+                    Style::new().fg(Color::Reset)
+                };
+
+                let label = field.name.title();
+
+                if let Field::Text(f) = &field.field {
+                    let text = f.text();
+                    let label_line = format!("{label}: ");
+                    let label_len = UnicodeWidthStr::width(label_line.as_str());
+
+                    let mut spans = vec![Span::styled(label_line, label_style)];
+                    if !text.is_empty() {
+                        spans.push(Span::raw(text.to_string()));
+                    } else if highlighted {
+                        spans.push(Span::raw("").style(Style::default()));
+                    }
+
+                    frame.render_widget(Line::from(spans), field_area);
+
+                    // Show cursor for focused text field
+                    if highlighted && !show_popup {
+                        if !(field.set_by_cli && config.search.disable_prepopulated_fields) {
+                            let cursor_pos = f.visual_cursor_pos();
                             frame.set_cursor_position(Position {
                                 x: field_area.x
                                     + u16::try_from(label_len).unwrap_or(0)
@@ -110,12 +219,6 @@ fn render_compact_search_fields(
                         }
                     }
                 }
-            }
-            Field::Checkbox(f) => {
-                let checked_marker = if f.checked { " X" } else { "  " };
-                let text = format!("{checked_marker} {label}");
-                let spans = vec![Span::styled(text, label_style)];
-                frame.render_widget(Line::from(spans), field_area);
             }
         }
     }
@@ -305,6 +408,17 @@ fn render_search_results(
             Constraint::Fill(3),
         ])
         .areas(results_area);
+        // Shift 15 columns from list to preview
+        let preview_extra = 15u16.min(list_area.width / 2);
+        let list_area = Rect {
+            width: list_area.width - preview_extra,
+            ..list_area
+        };
+        let preview_area = Rect {
+            x: list_area.x + list_area.width,
+            width: preview_area.width + preview_extra,
+            ..preview_area
+        };
         (list_area, preview_area)
     };
 
@@ -1583,12 +1697,7 @@ fn file_path_line<'a>(
             .fg(Color::Indexed(255));
     }
 
-    let right_content = if result.search_result.included {
-        " *".to_string()
-    } else {
-        String::new()
-    };
-    let right_content_len = right_content.chars().count();
+    let right_content_len = 0;
     let left_content = format!(
         "[{}] ",
         if result.search_result.included {
@@ -1629,7 +1738,6 @@ fn file_path_line<'a>(
         Span::raw(path),
         Span::raw(line_num).style(accessory_colour),
         Span::raw(spacers),
-        Span::raw(right_content).style(accessory_colour),
     ])
     .style(file_path_style)
 }
@@ -1897,9 +2005,8 @@ pub fn render(app: &mut App, frame: &mut Frame<'_>) {
             let has_replacement_progress = search_fields_state.replacement_progress.is_some();
             let fields_focussed = search_fields_state.focussed_section == FocussedSection::SearchFields;
 
-            // Compact layout: single-line fields (no boxes) + results + preview
-            let num_fields = app.search_fields.fields.len();
-            let fields_height = num_fields as u16;
+            // Compact layout: 4 visual rows (Search+toggles, Replace, Include, Exclude)
+            let fields_height: u16 = 4;
             let [fields_area, results_area] = Layout::vertical([
                 Constraint::Length(fields_height),
                 Constraint::Fill(1),
