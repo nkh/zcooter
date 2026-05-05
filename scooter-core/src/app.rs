@@ -257,7 +257,7 @@ impl SearchState {
     }
 
     /// Move to the first match in the next file (issue #4)
-    fn move_to_next_file(&mut self) {
+    pub fn move_to_next_file(&mut self) {
         if self.results.is_empty() {
             return;
         }
@@ -276,7 +276,7 @@ impl SearchState {
     }
 
     /// Move to the first match in the previous file (issue #4)
-    fn move_to_prev_file(&mut self) {
+    pub fn move_to_prev_file(&mut self) {
         if self.results.is_empty() {
             return;
         }
@@ -532,6 +532,9 @@ pub struct SearchFieldsState {
     /// Inline replacement progress — shown as a banner overlay instead of
     /// switching to a separate screen.
     pub replacement_progress: Option<PerformingReplacementState>,
+    /// Width of the file name column as a percentage of the results area (10–80).
+    /// Adjustable at runtime with Ctrl+Left / Ctrl+Right. Default is 33 (≈ 1/3).
+    pub file_column_width_pct: u16,
 }
 
 impl Default for SearchFieldsState {
@@ -545,6 +548,7 @@ impl Default for SearchFieldsState {
             next_search_generation: 0,
             pending_search_generation: None,
             replacement_progress: None,
+            file_column_width_pct: 33,
         }
     }
 }
@@ -2128,8 +2132,8 @@ impl<'a> App {
         if key_event.modifiers.contains(KeyModifiers::CONTROL) {
             if let KeyCode::Char(ch) = key_event.code {
                 match ch {
-                    'a' => {
-                        // Ctrl+A: toggle all files (works from any focus)
+                    'g' => {
+                        // Ctrl+G: toggle all files (works from any focus)
                         if let Some(state) = self.get_search_state_if_results() {
                             state.toggle_all_selected();
                             return Right(EventHandlingResult::Rerender);
@@ -2158,9 +2162,40 @@ impl<'a> App {
                     _ => {}
                 }
             }
+
+            // Ctrl+Up / Ctrl+Down: jump to previous / next file
+            if key_event.code == KeyCode::Up || key_event.code == KeyCode::Down {
+                if let Some(state) = self.get_search_state_if_results() {
+                    if key_event.code == KeyCode::Up {
+                        state.move_to_prev_file();
+                    } else {
+                        state.move_to_next_file();
+                    }
+                    let sfs = self
+                        .ui_state
+                        .current_screen
+                        .unwrap_search_fields_state_mut();
+                    sfs.focussed_section = FocussedSection::SearchResults;
+                    return Right(EventHandlingResult::Rerender);
+                }
+            }
+
+            // Ctrl+Left / Ctrl+Right: resize file name column
+            if key_event.code == KeyCode::Left || key_event.code == KeyCode::Right {
+                if let Screen::SearchFields(ref mut sfs) = self.ui_state.current_screen {
+                    let step: u16 = 3; // percentage points per key press
+                    let new_pct = if key_event.code == KeyCode::Left {
+                        sfs.file_column_width_pct.saturating_sub(step)
+                    } else {
+                        sfs.file_column_width_pct.saturating_add(step)
+                    };
+                    sfs.file_column_width_pct = new_pct.clamp(10, 80);
+                    return Right(EventHandlingResult::Rerender);
+                }
+            }
         }
 
-        // Up/Down arrows: navigate results even when focused on fields
+        // Up/Down arrows: navigate results by file even when focused on fields
         if !key_event.modifiers.contains(KeyModifiers::CONTROL)
             && !key_event.modifiers.contains(KeyModifiers::ALT)
         {
@@ -2177,11 +2212,11 @@ impl<'a> App {
                         .current_screen
                         .unwrap_search_fields_state_mut();
                     sfs.focussed_section = FocussedSection::SearchResults;
-                    // Navigate
+                    // Navigate by file (matches the keymap defaults: Up→prev_file, Down→next_file)
                     if matches!(key_event.code, KeyCode::Up) {
-                        self.get_search_state_unwrap().move_selected_up();
+                        self.get_search_state_unwrap().move_to_prev_file();
                     } else {
-                        self.get_search_state_unwrap().move_selected_down();
+                        self.get_search_state_unwrap().move_to_next_file();
                     }
                     return Right(EventHandlingResult::Rerender);
                 }

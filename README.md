@@ -339,7 +339,7 @@ move_up_full_page = ["C-b", "pageup"]      # Navigate to the search result a pag
 move_top = "g"                             # Navigate to the first search result
 move_bottom = "G"                          # Navigate to the last search result
 toggle_selected_inclusion = "space"        # Toggle whether the currently highlighted result will be replaced or ignored
-toggle_all_selected = "a"                  # Toggle whether all results will be replaced or ignored
+toggle_all_selected = "C-g"               # Toggle whether all results will be replaced or ignored
 toggle_multiselect_mode = "v"              # Toggle whether multiselect mode is enabled
 flip_multiselect_direction = "A-;"         # Flip the direction of the multiselect selection
 

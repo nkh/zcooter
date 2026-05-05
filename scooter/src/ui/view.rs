@@ -380,6 +380,7 @@ fn render_search_results(
     event_sender: UnboundedSender<Event>,
     area_is_focussed: bool,
     wrap: bool,
+    file_column_width_pct: u16,
 ) {
     let small_screen = area.width <= 110;
 
@@ -404,7 +405,7 @@ fn render_search_results(
         );
     }
 
-    // File name column: max 1/3 of screen width, preview takes the rest
+    // File name column: use dynamic width percentage, preview takes the rest
     let (list_area, preview_area) = if small_screen {
         let [list_area, preview_area] = Layout::vertical([
             #[allow(clippy::cast_possible_truncation)]
@@ -414,7 +415,7 @@ fn render_search_results(
         .areas(area);
         (list_area, preview_area)
     } else {
-        let max_list_width = area.width / 3;
+        let max_list_width = area.width * file_column_width_pct / 100;
         let [list_area, preview_area] = Layout::horizontal([
             Constraint::Max(max_list_width),
             Constraint::Fill(1),
@@ -2000,6 +2001,7 @@ pub fn render(app: &mut App, frame: &mut Frame<'_>) {
                     app.event_channels.sender.clone(),
                     search_fields_state.focussed_section == FocussedSection::SearchResults,
                     app.config.preview.wrap_text,
+                    search_fields_state.file_column_width_pct,
                 );
             } else if search_is_empty {
                 // No search state and search is empty — show nothing in results area

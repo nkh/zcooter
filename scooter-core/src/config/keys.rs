@@ -282,7 +282,7 @@ impl Default for KeysSearchFocusResults {
             move_bottom: keys![KeyEvent::new(KeyCode::Char('G'), KeyModifiers::NONE)],
 
             toggle_selected_inclusion: keys![KeyEvent::new(KeyCode::Char(' '), KeyModifiers::NONE)],
-            toggle_all_selected: keys![KeyEvent::new(KeyCode::Char('a'), KeyModifiers::CONTROL)],
+            toggle_all_selected: keys![KeyEvent::new(KeyCode::Char('g'), KeyModifiers::CONTROL)],
             toggle_multiselect_mode: keys![KeyEvent::new(KeyCode::Char('v'), KeyModifiers::NONE)],
 
             flip_multiselect_direction: keys![KeyEvent::new(KeyCode::Char(';'), KeyModifiers::ALT)],
