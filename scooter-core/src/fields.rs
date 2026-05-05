@@ -289,7 +289,7 @@ impl FieldName {
             FieldName::Search => "search",
             FieldName::Replace => "replace",
             FieldName::FixedStrings => "fixed",
-            FieldName::WholeWord => "match",
+            FieldName::WholeWord => "word",
             FieldName::MatchCase => "case sensitive",
             FieldName::IncludeFiles => "include",
             FieldName::ExcludeFiles => "exclude",

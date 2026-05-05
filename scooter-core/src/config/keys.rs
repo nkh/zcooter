@@ -257,17 +257,15 @@ impl Default for KeysSearchFocusResults {
             move_down: keys![
                 KeyEvent::new(KeyCode::Char('j'), KeyModifiers::NONE),
                 KeyEvent::new(KeyCode::Char('n'), KeyModifiers::CONTROL),
+                KeyEvent::new(KeyCode::Down, KeyModifiers::NONE),
             ],
             move_up: keys![
                 KeyEvent::new(KeyCode::Char('k'), KeyModifiers::NONE),
                 KeyEvent::new(KeyCode::Char('p'), KeyModifiers::CONTROL),
-            ],
-            move_next_file: keys![
-                KeyEvent::new(KeyCode::Down, KeyModifiers::NONE),
-            ],
-            move_prev_file: keys![
                 KeyEvent::new(KeyCode::Up, KeyModifiers::NONE),
             ],
+            move_next_file: keys![],
+            move_prev_file: keys![],
             move_down_half_page: keys![KeyEvent::new(KeyCode::Char('d'), KeyModifiers::CONTROL)],
             move_down_full_page: keys![
                 KeyEvent::new(KeyCode::Char('f'), KeyModifiers::CONTROL),

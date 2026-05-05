@@ -234,18 +234,32 @@ impl SearchState {
     }
 
     fn move_selected_up_by(&mut self, n: usize) {
-        let primary_selected_pos = self.primary_selected_pos();
-        if primary_selected_pos > 0 {
-            self.move_primary_sel(primary_selected_pos.saturating_sub(n));
+        if self.results.is_empty() {
+            return;
         }
+        let pos = self.primary_selected_pos();
+        let new_pos = if pos == 0 {
+            // Wrap to last result
+            self.results.len().saturating_sub(1)
+        } else {
+            pos.saturating_sub(n)
+        };
+        self.move_primary_sel(new_pos);
     }
 
     fn move_selected_down_by(&mut self, n: usize) {
-        let primary_selected_pos = self.primary_selected_pos();
-        let end = self.results.len().saturating_sub(1);
-        if primary_selected_pos < end {
-            self.move_primary_sel(min(primary_selected_pos + n, end));
+        if self.results.is_empty() {
+            return;
         }
+        let pos = self.primary_selected_pos();
+        let end = self.results.len().saturating_sub(1);
+        let new_pos = if pos >= end {
+            // Wrap to first result
+            0
+        } else {
+            min(pos + n, end)
+        };
+        self.move_primary_sel(new_pos);
     }
 
     fn move_selected_up(&mut self) {
@@ -2195,30 +2209,31 @@ impl<'a> App {
             }
         }
 
-        // Up/Down arrows: navigate results by file even when focused on fields
+        // Up/Down arrows: when focused on fields, transition into results
+        // Up → last entry, Down → first entry
         if !key_event.modifiers.contains(KeyModifiers::CONTROL)
             && !key_event.modifiers.contains(KeyModifiers::ALT)
         {
             if matches!(key_event.code, KeyCode::Up) || matches!(key_event.code, KeyCode::Down) {
-                let has_results = if let Screen::SearchFields(ref state) = self.ui_state.current_screen {
-                    state.search_state.as_ref().map_or(false, |s| !s.results.is_empty())
-                } else {
-                    false
-                };
-                if has_results {
-                    // Switch to results focus
-                    let sfs = self
-                        .ui_state
-                        .current_screen
-                        .unwrap_search_fields_state_mut();
-                    sfs.focussed_section = FocussedSection::SearchResults;
-                    // Navigate by file (matches the keymap defaults: Up→prev_file, Down→next_file)
-                    if matches!(key_event.code, KeyCode::Up) {
-                        self.get_search_state_unwrap().move_to_prev_file();
-                    } else {
-                        self.get_search_state_unwrap().move_to_next_file();
+                if let Screen::SearchFields(ref state) = self.ui_state.current_screen {
+                    if state.focussed_section == FocussedSection::SearchFields {
+                        let has_results = state
+                            .search_state
+                            .as_ref()
+                            .map_or(false, |s| !s.results.is_empty());
+                        if has_results {
+                            let sfs = self
+                                .ui_state
+                                .current_screen
+                                .unwrap_search_fields_state_mut();
+                            sfs.focussed_section = FocussedSection::SearchResults;
+                            // Up → jump to last entry, Down → stay at first entry
+                            if matches!(key_event.code, KeyCode::Up) {
+                                self.get_search_state_unwrap().move_selected_bottom();
+                            }
+                            return Right(EventHandlingResult::Rerender);
+                        }
                     }
-                    return Right(EventHandlingResult::Rerender);
                 }
             }
         }

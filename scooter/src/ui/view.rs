@@ -64,7 +64,7 @@ fn render_compact_search_fields(
 ) {
     // Field indices: 0=Search, 1=Replace, 2=FixedStrings, 3=WholeWord, 4=MatchCase, 5=IncludeFiles, 6=ExcludeFiles
     // Visual layout (4 rows):
-    //   Row 0: search: <value>                    [X] fixed  [ ] match  [X] case sensitive
+    //   Row 0: search: <value>                    [X] fixed  [ ] word  [X] case sensitive
     //   Row 1: replace: <value>
     //   Row 2: include: <value>
     //   Row 3: exclude: <value>
@@ -162,27 +162,31 @@ fn render_compact_search_fields(
                 }
 
                 // Calculate spacer to push toggles to the right edge, leaving room for file count
-                let count_str = match search_phase {
-                    Some(SearchPhase::Running { .. }) => "searching ...".to_string(),
+                // Reserve 8 chars for the match count so toggles don't shift when it changes
+                const COUNT_WIDTH: usize = 8;
+                let count_str: String = match search_phase {
+                    Some(SearchPhase::Running { .. }) => "searching..".to_string(),
                     Some(SearchPhase::Invalid) => "[invalid]".to_string(),
                     Some(SearchPhase::Complete { .. }) if num_results > 0 => {
-                        format!("({num_results})")
+                        format!("({num_results:>6})")
                     }
                     _ => String::new(),
                 };
-                let count_width: usize = if count_str.is_empty() { 0 } else { UnicodeWidthStr::width(count_str.as_str()) + 1 };
-                let total_right_width = toggle_width + count_width;
+                let count_style = match search_phase {
+                    Some(SearchPhase::Running { .. }) => Style::new().fg(Color::Blue),
+                    Some(SearchPhase::Invalid) => Style::new().fg(Color::Red),
+                    _ => Style::new().fg(Color::Reset),
+                };
+                let total_right_width = toggle_width + COUNT_WIDTH;
                 let used_width: usize = spans.iter().map(|s| UnicodeWidthStr::width(s.content.as_ref())).sum();
                 let spacer_width = area.width.saturating_sub(used_width as u16 + total_right_width as u16) as usize;
                 spans.push(Span::raw(" ".repeat(spacer_width)));
                 spans.extend(toggle_spans);
                 if !count_str.is_empty() {
-                    let count_style = match search_phase {
-                        Some(SearchPhase::Running { .. }) => Style::new().fg(Color::Blue),
-                        Some(SearchPhase::Invalid) => Style::new().fg(Color::Red),
-                        _ => Style::new().fg(Color::Reset),
-                    };
-                    spans.push(Span::styled(format!(" {count_str}"), count_style));
+                    spans.push(Span::styled(
+                        format!("{count_str:>COUNT_WIDTH$}"),
+                        count_style,
+                    ));
                 }
 
                 frame.render_widget(Line::from(spans), field_area);
