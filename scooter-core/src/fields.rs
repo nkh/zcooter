@@ -286,13 +286,13 @@ pub enum FieldName {
 impl FieldName {
     pub fn title(&self) -> &str {
         match self {
-            FieldName::Search => "Search text",
-            FieldName::Replace => "Replace text",
-            FieldName::FixedStrings => "Fixed strings",
-            FieldName::WholeWord => "Match whole word",
-            FieldName::MatchCase => "Match case",
-            FieldName::IncludeFiles => "Files to include",
-            FieldName::ExcludeFiles => "Files to exclude",
+            FieldName::Search => "search",
+            FieldName::Replace => "replace",
+            FieldName::FixedStrings => "fixed",
+            FieldName::WholeWord => "match",
+            FieldName::MatchCase => "case sensitive",
+            FieldName::IncludeFiles => "include",
+            FieldName::ExcludeFiles => "exclude",
         }
     }
 }

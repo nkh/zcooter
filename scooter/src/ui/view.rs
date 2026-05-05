@@ -62,10 +62,10 @@ fn render_compact_search_fields(
 ) {
     // Field indices: 0=Search, 1=Replace, 2=FixedStrings, 3=WholeWord, 4=MatchCase, 5=IncludeFiles, 6=ExcludeFiles
     // Visual layout (4 rows):
-    //   Row 0: Search text: <value>    [X] Fixed strings  [ ] Match whole word  [X] Match case
-    //   Row 1: Replace text: <value>
-    //   Row 2: Files to include: <value>
-    //   Row 3: Files to exclude: <value>
+    //   Row 0: search: <value>                    [X] fixed  [ ] match  [X] case sensitive
+    //   Row 1: replace: <value>
+    //   Row 2: include: <value>
+    //   Row 3: exclude: <value>
 
     let num_visual_rows: u16 = 4;
 
@@ -86,7 +86,7 @@ fn render_compact_search_fields(
             0 => {
                 let search_field = &search_fields.fields[0];
                 let search_highlighted = is_focussed && search_fields.highlighted == 0;
-                let search_label = "Search text";
+                let search_label = search_fields.fields[0].name.title();
                 let search_label_line = format!("{search_label}: ");
                 let search_label_len = UnicodeWidthStr::width(search_label_line.as_str());
 
@@ -100,37 +100,8 @@ fn render_compact_search_fields(
                     Style::new().fg(Color::Reset)
                 };
 
-                let mut spans = vec![Span::styled(search_label_line, search_label_style)];
-
-                if let Field::Text(f) = &search_field.field {
-                    let text = f.text();
-                    if !text.is_empty() {
-                        // Truncate search text to leave room for toggles
-                        let toggle_area_width: usize = 55; // approx space for 3 toggles
-                        let available = area
-                            .width
-                            .saturating_sub(search_label_len as u16)
-                            .saturating_sub(toggle_area_width as u16) as usize;
-                        let display_text: Cow<'_, str> = if UnicodeWidthStr::width(text) > available {
-                            Cow::Owned(
-                                text.chars()
-                                    .take(available.saturating_sub(1))
-                                    .collect::<String>()
-                                    + "\u{2026}",
-                            )
-                        } else {
-                            Cow::Borrowed(text)
-                        };
-                        spans.push(Span::raw(display_text.to_string()));
-                    } else if search_highlighted {
-                        spans.push(Span::raw("").style(Style::default()));
-                    }
-                }
-
-                // Separator between search value and toggles
-                spans.push(Span::styled("   ", Style::default()));
-
-                // Render 3 toggle fields inline: FixedStrings(idx 2), WholeWord(idx 3), MatchCase(idx 4)
+                // Build toggle spans first to calculate their total width for right-alignment
+                let mut toggle_spans: Vec<Span<'_>> = Vec::new();
                 for (field_idx, field) in search_fields
                     .fields
                     .iter()
@@ -151,10 +122,48 @@ fn render_compact_search_fields(
                     if let Field::Checkbox(f) = &field.field {
                         let marker = if f.checked { "[X]" } else { "[ ]" };
                         let label = field.name.title();
-                        spans.push(Span::styled(format!("{marker} {label}"), toggle_style));
-                        spans.push(Span::styled("  ", Style::default()));
+                        toggle_spans.push(Span::styled(format!("{marker} {label}"), toggle_style));
+                        toggle_spans.push(Span::styled("  ", Style::default()));
                     }
                 }
+                // Remove trailing spacer
+                if toggle_spans.last().map_or(false, |s| s.content == "  ") {
+                    toggle_spans.pop();
+                }
+                let toggle_width: usize = toggle_spans.iter().map(|s| UnicodeWidthStr::width(s.content.as_ref())).sum();
+
+                let mut spans = vec![Span::styled(search_label_line, search_label_style)];
+
+                if let Field::Text(f) = &search_field.field {
+                    let text = f.text();
+                    if !text.is_empty() {
+                        // Truncate search text to leave room for right-aligned toggles
+                        let toggle_total_width = toggle_width + 1; // +1 for gap
+                        let available = area
+                            .width
+                            .saturating_sub(search_label_len as u16)
+                            .saturating_sub(toggle_total_width as u16) as usize;
+                        let display_text: Cow<'_, str> = if UnicodeWidthStr::width(text) > available {
+                            Cow::Owned(
+                                text.chars()
+                                    .take(available.saturating_sub(1))
+                                    .collect::<String>()
+                                    + "\u{2026}",
+                            )
+                        } else {
+                            Cow::Borrowed(text)
+                        };
+                        spans.push(Span::raw(display_text.to_string()));
+                    } else if search_highlighted {
+                        spans.push(Span::raw("").style(Style::default()));
+                    }
+                }
+
+                // Calculate spacer to push toggles to the right edge
+                let used_width: usize = spans.iter().map(|s| UnicodeWidthStr::width(s.content.as_ref())).sum();
+                let spacer_width = area.width.saturating_sub(used_width as u16 + toggle_width as u16) as usize;
+                spans.push(Span::raw(" ".repeat(spacer_width)));
+                spans.extend(toggle_spans);
 
                 frame.render_widget(Line::from(spans), field_area);
 
@@ -509,28 +518,22 @@ fn render_num_results(
     area: Rect,
     num_results: usize,
     status: BannerStatus,
-    time_taken: Option<Duration>,
+    _time_taken: Option<Duration>,
     num_replacements_updates_in_progress: Option<(usize, usize)>,
 ) {
-    let left_content_1 = format!("Results: {num_results}");
+    let left_content_1 = format!("found: {num_results}");
     let (left_content_2, accessory_colour) = match status {
         BannerStatus::Empty => (" [empty]", Color::Red),
         BannerStatus::Invalid => (" [invalid]", Color::Red),
-        BannerStatus::InProgress => (" [searching...]", Color::Blue),
-        BannerStatus::Complete => (" [done]", Color::Green),
+        BannerStatus::InProgress => (" searching ...", Color::Blue),
+        BannerStatus::Complete => ("", Color::Reset),
     };
     let mid_content = preview_update_status(num_replacements_updates_in_progress);
-    let right_content = time_taken
-        .map(|t| format!(" [{:.1}s]", display_duration(t)))
-        .unwrap_or_default();
+    let right_content = String::new();
     let num_total_spacers = (area.width as usize).saturating_sub(
         left_content_1.len() + left_content_2.len() + mid_content.len() + right_content.len(),
     );
     let spacers_each_side = " ".repeat(num_total_spacers / 2);
-    let time_colour = match status {
-        BannerStatus::Complete => Color::Green,
-        BannerStatus::Empty | BannerStatus::Invalid | BannerStatus::InProgress => Color::Blue,
-    };
 
     frame.render_widget(
         Line::from(vec![
@@ -539,7 +542,7 @@ fn render_num_results(
             Span::raw(spacers_each_side.clone()),
             Span::raw(mid_content).fg(Color::Blue),
             Span::raw(spacers_each_side),
-            Span::raw(right_content).fg(time_colour),
+            Span::raw(right_content),
         ]),
         area,
     );
