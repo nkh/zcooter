@@ -616,6 +616,7 @@ fn write_results_impl(
         Some(ReplaceState {
             num_successes,
             num_ignored,
+            num_files: 1,
             errors: Vec::new(),
             replacement_errors_pos: 0,
         })

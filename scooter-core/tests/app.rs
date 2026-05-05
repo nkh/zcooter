@@ -39,6 +39,7 @@ async fn test_replace_state() {
     let mut state = ReplaceState {
         num_successes: 2,
         num_ignored: 1,
+        num_files: 2,
         errors: (1..3)
             .map(|n| SearchResultWithReplacement {
                 search_result: SearchResult::new_line(
@@ -78,6 +79,7 @@ async fn test_app_reset() {
     app.ui_state.current_screen = Screen::Results(ReplaceState {
         num_successes: 5,
         num_ignored: 2,
+        num_files: 5,
         errors: vec![],
         replacement_errors_pos: 0,
     });
@@ -288,6 +290,7 @@ async fn test_help_popup_on_results() {
     let results_state = ReplaceState {
         num_successes: 5,
         num_ignored: 2,
+        num_files: 5,
         errors: vec![],
         replacement_errors_pos: 0,
     };
@@ -397,6 +400,7 @@ async fn test_keymaps_results() {
     let replace_state_with_errors = ReplaceState {
         num_successes: 5,
         num_ignored: 2,
+        num_files: 1,
         errors: vec![SearchResultWithReplacement {
             search_result: SearchResult::new_line(
                 Some(PathBuf::from("error.txt")),
@@ -419,6 +423,7 @@ async fn test_keymaps_results() {
     let replace_state_without_errors = ReplaceState {
         num_successes: 5,
         num_ignored: 2,
+        num_files: 5,
         errors: vec![],
         replacement_errors_pos: 0,
     };

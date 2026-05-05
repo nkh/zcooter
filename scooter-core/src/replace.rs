@@ -246,6 +246,7 @@ fn read_validation_haystack(
 pub struct ReplaceState {
     pub num_successes: usize,
     pub num_ignored: usize,
+    pub num_files: usize,
     pub errors: Vec<SearchResultWithReplacement>,
     pub replacement_errors_pos: usize,
 }
@@ -354,6 +355,7 @@ pub fn perform_replacement(
             ReplaceState {
                 num_successes: stats.num_successes,
                 num_ignored,
+                num_files: stats.num_files,
                 errors: stats.errors,
                 replacement_errors_pos: 0,
             },
@@ -835,6 +837,7 @@ pub fn interpret_escapes(s: &str) -> String {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ReplaceStats {
     pub num_successes: usize,
+    pub num_files: usize,
     pub errors: Vec<SearchResultWithReplacement>,
 }
 
@@ -842,8 +845,11 @@ pub fn calculate_statistics<I>(results: I) -> ReplaceStats
 where
     I: IntoIterator<Item = SearchResultWithReplacement>,
 {
+    use std::collections::HashSet;
+
     let mut num_successes = 0;
     let mut errors = vec![];
+    let mut successful_files = HashSet::new();
 
     results.into_iter().for_each(|mut res| {
         assert!(
@@ -857,6 +863,9 @@ where
         match &res.replace_result {
             Some(ReplaceResult::Success) => {
                 num_successes += 1;
+                if let Some(ref path) = res.search_result.path {
+                    successful_files.insert(path.clone());
+                }
             }
             None => {
                 res.replace_result = Some(ReplaceResult::Error(
@@ -872,6 +881,7 @@ where
 
     ReplaceStats {
         num_successes,
+        num_files: successful_files.len(),
         errors,
     }
 }
@@ -1359,6 +1369,7 @@ mod tests {
         let mut state = ReplaceState {
             num_successes: 5,
             num_ignored: 2,
+            num_files: 3,
             errors: vec![
                 create_search_result_with_replacement(
                     "file1.txt",
@@ -1406,6 +1417,7 @@ mod tests {
         let mut state = ReplaceState {
             num_successes: 5,
             num_ignored: 2,
+            num_files: 3,
             errors: vec![
                 create_search_result_with_replacement(
                     "file1.txt",
@@ -1453,6 +1465,7 @@ mod tests {
         let mut state = ReplaceState {
             num_successes: 5,
             num_ignored: 2,
+            num_files: 3,
             errors: vec![
                 create_search_result_with_replacement(
                     "file1.txt",

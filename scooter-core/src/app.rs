@@ -1618,13 +1618,41 @@ impl<'a> App {
                 if self.run_config.print_results {
                     EventHandlingResult::new_exit_stats(replace_state)
                 } else {
-                    // Show results as a dismissable popup instead of switching screen
+                    // Reset focus to search fields and clear search state
                     if let Screen::SearchFields(ref mut search_fields_state) =
                         self.ui_state.current_screen
                     {
                         search_fields_state.replacement_progress = None;
+                        search_fields_state.focussed_section = FocussedSection::SearchFields;
+                        search_fields_state.search_state = None;
+                        search_fields_state.cancel_pending_async_work();
                     }
-                    self.ui_state.popup = Some(Popup::ReplacementResults(replace_state));
+                    // Show replacement result as a toast
+                    let file_word = if replace_state.num_files == 1 {
+                        "file"
+                    } else {
+                        "files"
+                    };
+                    let message = if replace_state.errors.is_empty() {
+                        format!(
+                            "Replaced {} match{} in {} {}",
+                            replace_state.num_successes,
+                            if replace_state.num_successes == 1 { "" } else { "es" },
+                            replace_state.num_files,
+                            file_word,
+                        )
+                    } else {
+                        format!(
+                            "Replaced {} match{} in {} {} ({} error{})",
+                            replace_state.num_successes,
+                            if replace_state.num_successes == 1 { "" } else { "es" },
+                            replace_state.num_files,
+                            file_word,
+                            replace_state.errors.len(),
+                            if replace_state.errors.len() == 1 { "" } else { "s" },
+                        )
+                    };
+                    self.show_toast(message, Duration::from_secs(4));
                     EventHandlingResult::Rerender
                 }
             }
