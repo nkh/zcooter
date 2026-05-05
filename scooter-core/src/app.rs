@@ -235,9 +235,7 @@ impl SearchState {
 
     fn move_selected_up_by(&mut self, n: usize) {
         let primary_selected_pos = self.primary_selected_pos();
-        if primary_selected_pos == 0 {
-            self.selected = Selected::Single(self.results.len().saturating_sub(1));
-        } else {
+        if primary_selected_pos > 0 {
             self.move_primary_sel(primary_selected_pos.saturating_sub(n));
         }
     }
@@ -245,9 +243,7 @@ impl SearchState {
     fn move_selected_down_by(&mut self, n: usize) {
         let primary_selected_pos = self.primary_selected_pos();
         let end = self.results.len().saturating_sub(1);
-        if primary_selected_pos >= end {
-            self.selected = Selected::Single(0);
-        } else {
+        if primary_selected_pos < end {
             self.move_primary_sel(min(primary_selected_pos + n, end));
         }
     }
@@ -1883,6 +1879,24 @@ impl<'a> App {
             .expect("Focussed on search results but search_state is None")
     }
 
+    fn get_search_state_if_results(&mut self) -> Option<&mut SearchState> {
+        if let Screen::SearchFields(ref mut state) = self.ui_state.current_screen {
+            state.search_state.as_mut()
+        } else {
+            None
+        }
+    }
+
+    fn focus_field(&mut self, field_index: usize) -> EventHandlingResult {
+        let sfs = self
+            .ui_state
+            .current_screen
+            .unwrap_search_fields_state_mut();
+        sfs.focussed_section = FocussedSection::SearchFields;
+        self.search_fields.highlighted = field_index;
+        EventHandlingResult::Rerender
+    }
+
     /// Should only be called on `Screen::SearchFields`, and when focussed section is `FocussedSection::SearchResults`
     #[allow(clippy::needless_pass_by_value)]
     fn handle_command_search_results(
@@ -2110,6 +2124,70 @@ impl<'a> App {
             return Right(self.handle_file_finder_key(key_event));
         }
 
+        // Global shortcuts that work regardless of focus
+        if key_event.modifiers.contains(KeyModifiers::CONTROL) {
+            if let KeyCode::Char(ch) = key_event.code {
+                match ch {
+                    'a' => {
+                        // Ctrl+A: toggle all files (works from any focus)
+                        if let Some(state) = self.get_search_state_if_results() {
+                            state.toggle_all_selected();
+                            return Right(EventHandlingResult::Rerender);
+                        }
+                    }
+                    's' => {
+                        // Ctrl+S: focus search field
+                        return Right(self.focus_field(0));
+                    }
+                    'r' => {
+                        // Ctrl+R: focus replace field
+                        return Right(self.focus_field(1));
+                    }
+                    'i' => {
+                        // Ctrl+I: focus include field
+                        return Right(self.focus_field(5));
+                    }
+                    'e' => {
+                        // Ctrl+E: focus exclude field
+                        return Right(self.focus_field(6));
+                    }
+                    't' => {
+                        // Ctrl+T: focus fixed field (first toggle)
+                        return Right(self.focus_field(2));
+                    }
+                    _ => {}
+                }
+            }
+        }
+
+        // Up/Down arrows: navigate results even when focused on fields
+        if !key_event.modifiers.contains(KeyModifiers::CONTROL)
+            && !key_event.modifiers.contains(KeyModifiers::ALT)
+        {
+            if matches!(key_event.code, KeyCode::Up) || matches!(key_event.code, KeyCode::Down) {
+                let has_results = if let Screen::SearchFields(ref state) = self.ui_state.current_screen {
+                    state.search_state.as_ref().map_or(false, |s| !s.results.is_empty())
+                } else {
+                    false
+                };
+                if has_results {
+                    // Switch to results focus
+                    let sfs = self
+                        .ui_state
+                        .current_screen
+                        .unwrap_search_fields_state_mut();
+                    sfs.focussed_section = FocussedSection::SearchResults;
+                    // Navigate
+                    if matches!(key_event.code, KeyCode::Up) {
+                        self.get_search_state_unwrap().move_selected_up();
+                    } else {
+                        self.get_search_state_unwrap().move_selected_down();
+                    }
+                    return Right(EventHandlingResult::Rerender);
+                }
+            }
+        }
+
         let maybe_event = self
             .key_map
             .lookup(&self.ui_state.current_screen, key_event);
@@ -2153,15 +2231,35 @@ impl<'a> App {
                             return Right(EventHandlingResult::Rerender);
                         }
                     }
-                    Command::SearchFields(CommandSearchFields::SearchFocusFields(
-                        CommandSearchFocusFields::EnterChars(key_event.code, key_event.modifiers),
-                    ))
+                    // Fall through to return Left(Command) below
                 } else {
+                    // In results focus: forward unbound char keys to the search field
+                    if let KeyCode::Char(_) = key_event.code {
+                        if !key_event.modifiers.contains(KeyModifiers::CONTROL)
+                            && !key_event.modifiers.contains(KeyModifiers::ALT)
+                        {
+                            // Switch to fields focus and enter the char
+                            let sfs = self
+                                .ui_state
+                                .current_screen
+                                .unwrap_search_fields_state_mut();
+                            sfs.focussed_section = FocussedSection::SearchFields;
+                            return Right(self.enter_chars_into_field(
+                                key_event.code,
+                                key_event.modifiers,
+                            ));
+                        }
+                    }
                     return Right(EventHandlingResult::None);
                 }
             } else {
                 return Right(EventHandlingResult::None);
             }
+
+            // Reachable only when in SearchFields focus with no file finder
+            Command::SearchFields(CommandSearchFields::SearchFocusFields(
+                CommandSearchFocusFields::EnterChars(key_event.code, key_event.modifiers),
+            ))
         };
         Left(event)
     }

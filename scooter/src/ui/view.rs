@@ -59,6 +59,8 @@ fn render_compact_search_fields(
     show_popup: bool,
     is_focussed: bool,
     area: Rect,
+    num_results: usize,
+    search_phase: Option<SearchPhase>,
 ) {
     // Field indices: 0=Search, 1=Replace, 2=FixedStrings, 3=WholeWord, 4=MatchCase, 5=IncludeFiles, 6=ExcludeFiles
     // Visual layout (4 rows):
@@ -159,11 +161,29 @@ fn render_compact_search_fields(
                     }
                 }
 
-                // Calculate spacer to push toggles to the right edge
+                // Calculate spacer to push toggles to the right edge, leaving room for file count
+                let count_str = match search_phase {
+                    Some(SearchPhase::Running { .. }) => "searching ...".to_string(),
+                    Some(SearchPhase::Invalid) => "[invalid]".to_string(),
+                    Some(SearchPhase::Complete { .. }) if num_results > 0 => {
+                        format!("({num_results})")
+                    }
+                    _ => String::new(),
+                };
+                let count_width: usize = if count_str.is_empty() { 0 } else { UnicodeWidthStr::width(count_str.as_str()) + 1 };
+                let total_right_width = toggle_width + count_width;
                 let used_width: usize = spans.iter().map(|s| UnicodeWidthStr::width(s.content.as_ref())).sum();
-                let spacer_width = area.width.saturating_sub(used_width as u16 + toggle_width as u16) as usize;
+                let spacer_width = area.width.saturating_sub(used_width as u16 + total_right_width as u16) as usize;
                 spans.push(Span::raw(" ".repeat(spacer_width)));
                 spans.extend(toggle_spans);
+                if !count_str.is_empty() {
+                    let count_style = match search_phase {
+                        Some(SearchPhase::Running { .. }) => Style::new().fg(Color::Blue),
+                        Some(SearchPhase::Invalid) => Style::new().fg(Color::Red),
+                        _ => Style::new().fg(Color::Reset),
+                    };
+                    spans.push(Span::styled(format!(" {count_str}"), count_style));
+                }
 
                 frame.render_widget(Line::from(spans), field_area);
 
@@ -239,7 +259,7 @@ fn render_compact_search_fields(
 // Legacy boxed field rendering — kept for reference but no longer used
 #[allow(dead_code)]
 fn render_search_fields_boxed(
-    frame: &mut Frame<'_>,
+    _frame: &mut Frame<'_>,
     _search_fields: &SearchFields,
     _config: &Config,
     _show_popup: bool,
@@ -342,6 +362,7 @@ fn display_duration(duration: Duration) -> String {
 }
 
 #[derive(Clone, Copy)]
+#[allow(dead_code)]
 enum BannerStatus {
     Empty,
     Invalid,
@@ -349,7 +370,6 @@ enum BannerStatus {
     Complete,
 }
 
-#[allow(clippy::too_many_arguments, clippy::too_many_lines)]
 fn render_search_results(
     frame: &mut Frame<'_>,
     input_source: &InputSource,
@@ -359,37 +379,15 @@ fn render_search_results(
     true_colour: bool,
     event_sender: UnboundedSender<Event>,
     area_is_focussed: bool,
-    preview_update_status: Option<(usize, usize)>,
     wrap: bool,
 ) {
     let small_screen = area.width <= 110;
 
-    let [num_results_area, results_area] = Layout::vertical([
-        Constraint::Length(1),
-        Constraint::Fill(1),
-    ])
-    .flex(Flex::Start)
-    .areas(area);
-
     let num_results = search_state.results.len();
-    let status = match search_state.phase {
-        SearchPhase::Invalid => BannerStatus::Invalid,
-        _ if search_state.phase.is_complete() => BannerStatus::Complete,
-        _ => BannerStatus::InProgress,
-    };
-    render_num_results(
-        frame,
-        num_results_area,
-        num_results,
-        status,
-        search_state.phase.elapsed(),
-        preview_update_status,
-    );
-
     let num_to_render = if small_screen {
         5
     } else {
-        results_area.height as usize
+        area.height as usize
     };
 
     search_state.num_displayed = Some(num_to_render);
@@ -406,31 +404,22 @@ fn render_search_results(
         );
     }
 
+    // File name column: max 1/3 of screen width, preview takes the rest
     let (list_area, preview_area) = if small_screen {
         let [list_area, preview_area] = Layout::vertical([
             #[allow(clippy::cast_possible_truncation)]
             Constraint::Length(num_to_render as u16),
             Constraint::Fill(1),
         ])
-        .areas(results_area);
+        .areas(area);
         (list_area, preview_area)
     } else {
+        let max_list_width = area.width / 3;
         let [list_area, preview_area] = Layout::horizontal([
-            Constraint::Fill(2),
-            Constraint::Fill(3),
+            Constraint::Max(max_list_width),
+            Constraint::Fill(1),
         ])
-        .areas(results_area);
-        // Shift 15 columns from list to preview
-        let preview_extra = 15u16.min(list_area.width / 2);
-        let list_area = Rect {
-            width: list_area.width - preview_extra,
-            ..list_area
-        };
-        let preview_area = Rect {
-            x: list_area.x + list_area.width,
-            width: preview_area.width + preview_extra,
-            ..preview_area
-        };
+        .areas(area);
         (list_area, preview_area)
     };
 
@@ -496,70 +485,29 @@ fn render_search_results(
     }
 }
 
+#[allow(dead_code)]
 fn render_empty_search_banner(
-    frame: &mut Frame<'_>,
-    area: Rect,
-    num_replacements_updates_in_progress: Option<(usize, usize)>,
+    _frame: &mut Frame<'_>,
+    _area: Rect,
+    _num_replacements_updates_in_progress: Option<(usize, usize)>,
 ) {
-    let [num_results_area, _] =
-        Layout::vertical([Constraint::Length(1), Constraint::Fill(1)]).areas(area);
-    render_num_results(
-        frame,
-        num_results_area,
-        0,
-        BannerStatus::Empty,
-        None,
-        num_replacements_updates_in_progress,
-    );
+    // No longer used — the "found:" bar has been removed
 }
 
+#[allow(dead_code)]
 fn render_num_results(
-    frame: &mut Frame<'_>,
-    area: Rect,
-    num_results: usize,
-    status: BannerStatus,
+    _frame: &mut Frame<'_>,
+    _area: Rect,
+    _num_results: usize,
+    _status: BannerStatus,
     _time_taken: Option<Duration>,
-    num_replacements_updates_in_progress: Option<(usize, usize)>,
+    _num_replacements_updates_in_progress: Option<(usize, usize)>,
 ) {
-    let left_content_1 = format!("found: {num_results}");
-    let (left_content_2, accessory_colour) = match status {
-        BannerStatus::Empty => (" [empty]", Color::Red),
-        BannerStatus::Invalid => (" [invalid]", Color::Red),
-        BannerStatus::InProgress => (" searching ...", Color::Blue),
-        BannerStatus::Complete => ("", Color::Reset),
-    };
-    let mid_content = preview_update_status(num_replacements_updates_in_progress);
-    let right_content = String::new();
-    let num_total_spacers = (area.width as usize).saturating_sub(
-        left_content_1.len() + left_content_2.len() + mid_content.len() + right_content.len(),
-    );
-    let spacers_each_side = " ".repeat(num_total_spacers / 2);
-
-    frame.render_widget(
-        Line::from(vec![
-            Span::raw(left_content_1),
-            Span::raw(left_content_2).fg(accessory_colour),
-            Span::raw(spacers_each_side.clone()),
-            Span::raw(mid_content).fg(Color::Blue),
-            Span::raw(spacers_each_side),
-            Span::raw(right_content),
-        ]),
-        area,
-    );
+    // No longer used — the "found:" bar has been removed
 }
 
-fn preview_update_status(num_replacements_updates_in_progress: Option<(usize, usize)>) -> String {
-    if let Some((complete, total)) = num_replacements_updates_in_progress {
-        // Avoid flickering - only show if it will take some time
-        if total >= 10_000 {
-            #[allow(clippy::cast_precision_loss)]
-            return format!(
-                "[Updating preview: {complete}/{total} ({perc:.2}%)]",
-                perc = ((complete as f64) / (total as f64)) * 100.0
-            );
-        }
-    }
-
+#[allow(dead_code)]
+fn preview_update_status(_num_replacements_updates_in_progress: Option<(usize, usize)>) -> String {
     String::new()
 }
 
@@ -1683,7 +1631,7 @@ fn search_result<'a>(
 static TRUNCATION_PREFIX: &str = "…";
 
 fn file_path_line<'a>(
-    idx: usize,
+    _idx: usize,
     result: &SearchResultWithReplacement,
     base_path: &Path,
     is_selected: bool,
@@ -2019,6 +1967,11 @@ pub fn render(app: &mut App, frame: &mut Frame<'_>) {
             ])
             .areas(content_area);
 
+            let (num_results, search_phase) = match &search_fields_state.search_state {
+                Some(state) => (state.results.len(), Some(state.phase)),
+                None => (0, None),
+            };
+
             render_compact_search_fields(
                 frame,
                 &app.search_fields,
@@ -2026,9 +1979,10 @@ pub fn render(app: &mut App, frame: &mut Frame<'_>) {
                 show_popup,
                 fields_focussed,
                 fields_area,
+                num_results,
+                search_phase,
             );
 
-            let replacements_in_progress = search_fields_state.replacements_in_progress();
             let search_is_empty = app.search_fields.search().text().is_empty();
 
             if has_replacement_progress {
@@ -2045,11 +1999,10 @@ pub fn render(app: &mut App, frame: &mut Frame<'_>) {
                     app.config.style.true_color,
                     app.event_channels.sender.clone(),
                     search_fields_state.focussed_section == FocussedSection::SearchResults,
-                    replacements_in_progress,
                     app.config.preview.wrap_text,
                 );
             } else if search_is_empty {
-                render_empty_search_banner(frame, results_area, replacements_in_progress);
+                // No search state and search is empty — show nothing in results area
             }
         }
         Screen::PerformingReplacement(state) => {
