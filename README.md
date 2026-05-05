@@ -430,39 +430,6 @@ exit = true
 
 You can pipe content from Helix to scooter, and it will write the updated contents back to the buffer in Helix. Select some contents in Helix, and then enter `:| scooter --print-on-exit >/dev/tty` (i.e. press `:`, type or paste `| scooter --print-on-exit >/dev/tty`, and then press enter). scooter will open, allowing you to find and replace on the contents: once you're done, the buffer will have been updated with any changes.
 
-### Vim / Neovim (terminal mode)
-
-You can use Vim's terminal mode to run scooter within a split or popup. Here are some useful mappings:
-
-```vim
-" Auto-close terminal splits when the process exits
-autocmd TermClose * silent! close
-
-" Open scooter full screen
-nnoremap <leader>s :terminal scooter<CR>
-
-" Open scooter for the current file
-nnoremap <leader>f :terminal scooter %<CR>
-
-" Open scooter for all files in the current git repo
-nnoremap <leader>a :terminal scooter $(git rev-parse --show-toplevel)<CR>
-
-" Open scooter with visual selection as the search text
-vnoremap <leader>r y:terminal scooter --fixed-strings --search-text <C-R>"<CR>
-```
-
-Add the `autocmd TermClose` line to your vimrc to make terminal splits close automatically when the process exits. The mappings above open scooter in the current window — use `:only | terminal scooter` instead of `:terminal scooter` if you want scooter to take over the full screen (hiding other splits).
-
-For `:terminal scooter %`, the `%` expands to the current file path in Vim/Neovim. If you're using Neovim, you may prefer the [ToggleTerm](#option-2-using-toggleterm) or [snacks.nvim](#snacksnvim) integration above, which provides a floating window experience.
-
-To open files from scooter back in Vim, add the following to your [scooter config file](#configuration-options):
-
-```toml
-[editor_open]
-command = "vim +%line %file"
-exit = true
-```
-
 ### Neovim
 
 You can integrate scooter with Neovim using either [ToggleTerm](https://github.com/akinsho/toggleterm.nvim) or [snacks.nvim](https://github.com/folke/snacks.nvim). Both configurations provide the following keymaps:
