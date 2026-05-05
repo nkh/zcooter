@@ -178,13 +178,14 @@ fn render_compact_search_fields(
                     Some(SearchPhase::Complete { .. }) => Style::new().fg(Color::Reset),
                     _ => Style::new().fg(Color::Reset),
                 };
-                // +1 ensures at least one space between last toggle and count
+                // +1 for the space between toggles and count
                 let total_right_width = toggle_width + 1 + COUNT_WIDTH;
                 let used_width: usize = spans.iter().map(|s| UnicodeWidthStr::width(s.content.as_ref())).sum();
                 let spacer_width = area.width.saturating_sub(used_width as u16 + total_right_width as u16) as usize;
                 spans.push(Span::raw(" ".repeat(spacer_width)));
                 spans.extend(toggle_spans);
                 if !count_str.is_empty() {
+                    spans.push(Span::raw(" "));
                     spans.push(Span::styled(
                         format!("{count_str:>COUNT_WIDTH$}"),
                         count_style,
