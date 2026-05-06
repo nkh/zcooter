@@ -419,6 +419,8 @@ mod tests {
             editor_command: None,
             file_list_height: None,
             editable: false,
+            file_finder_command: None,
+            open_file_finder_key: None,
         }
     }
 

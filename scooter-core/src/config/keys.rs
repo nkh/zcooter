@@ -200,7 +200,7 @@ impl Default for KeysSearchFocusFields {
             trigger_search: keys![KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE)],
             focus_next_field: keys![KeyEvent::new(KeyCode::Tab, KeyModifiers::NONE)],
             focus_previous_field: keys![KeyEvent::new(KeyCode::Tab, KeyModifiers::SHIFT)],
-            open_file_finder: keys![KeyEvent::new(KeyCode::Char('t'), KeyModifiers::CONTROL)],
+            open_file_finder: keys![KeyEvent::new(KeyCode::Char('f'), KeyModifiers::ALT)],
         }
     }
 }
