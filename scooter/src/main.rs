@@ -85,6 +85,10 @@ struct Args {
     #[arg(short = 'c', long, value_parser = parse_config_dir)]
     config_dir: Option<PathBuf>,
 
+    /// Use the specified config file instead of the default config.toml
+    #[arg(long, value_name = "FILE")]
+    config: Option<PathBuf>,
+
     /// Override stdin detection, forcing scooter to process files rather reading from stdin
     #[arg(long)]
     no_stdin: bool,
@@ -338,6 +342,9 @@ async fn main() -> anyhow::Result<()> {
     if let Some(config_dir) = &args.config_dir {
         config::set_config_dir_override(config_dir);
     }
+    if let Some(config_file) = &args.config {
+        config::set_config_file_override(config_file);
+    }
     let config = AppConfig::try_from(&args)?;
     setup_logging(config.log_level)?;
 
@@ -416,6 +423,7 @@ mod tests {
             files_to_include: None,
             files_to_exclude: None,
             config_dir: None,
+            config: None,
             editor_command: None,
             file_list_height: None,
             editable: false,

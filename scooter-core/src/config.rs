@@ -26,11 +26,18 @@ fn get_theme_set() -> &'static ThemeSet {
 }
 
 static CONFIG_DIR_OVERRIDE: OnceLock<PathBuf> = OnceLock::new();
+static CONFIG_FILE_OVERRIDE: OnceLock<PathBuf> = OnceLock::new();
 
 pub fn set_config_dir_override(dir: &Path) {
     CONFIG_DIR_OVERRIDE
         .set(dir.to_path_buf())
         .expect("Config dir override should only be set once");
+}
+
+pub fn set_config_file_override(file: &Path) {
+    CONFIG_FILE_OVERRIDE
+        .set(file.to_path_buf())
+        .expect("Config file override should only be set once");
 }
 
 fn config_dir() -> PathBuf {
@@ -42,6 +49,9 @@ fn config_dir() -> PathBuf {
 }
 
 fn config_file() -> PathBuf {
+    if let Some(file) = CONFIG_FILE_OVERRIDE.get() {
+        return file.clone();
+    }
     config_dir().join("config.toml")
 }
 
@@ -77,11 +87,17 @@ impl Config {
 }
 
 pub fn load_config() -> anyhow::Result<Config> {
-    let config_file = &config_file();
-    if fs::exists(config_file)? {
-        let contents = fs::read_to_string(config_file)?;
+    let config_path = config_file();
+    let explicitly_set = CONFIG_FILE_OVERRIDE.get().is_some();
+    if fs::exists(&config_path)? {
+        let contents = fs::read_to_string(&config_path)?;
         let config = toml::from_str(&contents)?;
         Ok(config)
+    } else if explicitly_set {
+        Err(anyhow!(
+            "Config file '{}' does not exist",
+            config_path.display()
+        ))
     } else {
         Ok(Config::default())
     }
