@@ -1,0 +1,140 @@
+# Scooter default configuration file
+# Copy this file to ~/.config/scooter/config.toml (or %AppData%\scooter\ on Windows)
+# and modify the values as needed. Only the settings you change need to be present;
+# all values below show the defaults.
+
+# =============================================================================
+# Editor
+# =============================================================================
+[editor_open]
+# The command used when pressing `e` on the search results page.
+# Two variables are available: %file (file path) and %line (line number).
+# If not set, scooter uses the $EDITOR (or $VISUAL) environment variable.
+# command = "vi %file +%line"
+
+# Whether to exit scooter after running the editor_open command. Default: false.
+# exit = false
+
+# =============================================================================
+# Preview
+# =============================================================================
+[preview]
+# Whether to apply syntax highlighting. Default: true.
+# syntax_highlighting = true
+
+# Theme name for syntax highlighting.
+# Built-in options: "base16-eighties.dark", "base16-mocha.dark", "base16-ocean.dark",
+# "base16-ocean.light", "InspiredGitHub", "Solarized (dark)", "Solarized (light)".
+# Custom .tmTheme files can be placed in ~/.config/scooter/themes/
+# syntax_highlighting_theme = "base16-eighties.dark"
+
+# Wrap text in preview if wider than window. Default: false.
+# wrap_text = false
+
+# Width of the file name column as a percentage of the results area (10-80).
+# The preview takes the remaining space. Default: 25.
+# file_column_percentage = 25
+
+# Number of lines for the file list in compact layout (narrow terminals, width <= 110).
+# Default: 5.
+# file_list_height = 5
+
+# =============================================================================
+# Style
+# =============================================================================
+[style]
+# Force true color support. true = force on, false = force 256 colors.
+# If omitted, auto-detected from terminal capabilities.
+# true_color = true
+
+# =============================================================================
+# Search
+# =============================================================================
+[search]
+# Whether to disable editing of fields set by CLI flags. Default: true.
+# disable_prepopulated_fields = true
+
+# Interpret escape sequences in replacement text.
+# \n = newline, \t = tab, \\ = backslash. Default: false.
+# interpret_escape_sequences = false
+
+# Ordered list of fields that receive focus during Tab navigation.
+# Fields not listed are skipped. Omit to use default order.
+# Valid names: "search", "replace", "fixed", "word", "case", "include", "exclude"
+# focus_fields = ["search", "replace", "fixed", "word", "case", "include", "exclude"]
+
+# External command for file selection (executed via sh -c).
+# Each line of stdout is treated as a file path.
+# Set to null or omit to use the built-in file finder.
+# file_finder_command = "fzf --multi"
+
+# =============================================================================
+# Key bindings
+# =============================================================================
+# Key format: C- = Ctrl, A- or M- = Alt, S- = Shift
+# Examples: "C-c" (Ctrl+C), "A-f" (Alt+F), "enter", "tab", "S-tab" (Shift+Tab)
+# Multi-key bindings: use an array, e.g. move_down = ["j", "down", "C-n"]
+
+[keys.general]
+# Exit scooter
+quit = "C-c"
+# Cancel in-progress operations, reset fields, return to search
+reset = "C-r"
+# Show help menu with keymaps
+show_help_menu = "C-h"
+
+[keys.search]
+# Toggle preview line wrapping
+toggle_preview_wrapping = "C-l"
+# Toggle hidden files/directories (dotfiles)
+toggle_hidden_files = "C-t"
+# Toggle multiline search
+toggle_multiline = "A-m"
+# Toggle escape sequence interpretation in replacement text
+toggle_interpret_escape_sequences = "A-e"
+
+[keys.search.fields]
+# Allow editing of CLI-prepopulated fields
+unlock_prepopulated_fields = "A-u"
+# Trigger a search
+trigger_search = "enter"
+# Focus next field
+focus_next_field = "tab"
+# Focus previous field
+focus_previous_field = "S-tab"
+# Open file finder popup (include/exclude fields only)
+open_file_finder = "A-f"
+
+[keys.search.results]
+# Trigger replacement
+trigger_replacement = "enter"
+# Return focus to search fields
+back_to_fields = "C-o"
+# Open result in editor
+open_in_editor = "e"
+
+# Navigation
+move_down = ["j", "C-n", "down"]
+move_up = ["k", "C-p", "up"]
+move_next_file = "C-down"
+move_prev_file = "C-up"
+move_down_half_page = "C-d"
+move_up_half_page = "C-u"
+move_down_full_page = ["C-f", "pagedown"]
+move_up_full_page = ["C-b", "pageup"]
+move_top = "g"
+move_bottom = "G"
+
+# Selection
+toggle_selected_inclusion = " "
+toggle_all_selected = "C-w"
+toggle_multiselect_mode = "v"
+flip_multiselect_direction = "A-;"
+
+[keys.performing_replacement]
+# (no keybindings defined for this screen)
+
+[keys.results]
+scroll_errors_down = ["j", "down", "C-n"]
+scroll_errors_up = ["k", "up", "C-p"]
+quit = ["enter", "q"]
