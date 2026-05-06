@@ -87,15 +87,17 @@ All search results defaulted to `included = true`, meaning pressing Replace woul
 ## 5. File Finder Popup (commit 435d7e4, issue #7)
 
 New interactive file/directory browser for include/exclude fields:
-- Press `Tab` in `include:` or `exclude:` fields to open
+- Press `Ctrl+T` in `include:` or `exclude:` fields to open (configurable via `keys.search.fields.open_file_finder`)
 - Type-to-filter, navigate with Up/Down/j/k
 - Enter to select (appends comma-separated glob to field)
 - Esc to close
 
 ### Code changes
-- `popup_file_finder` state added to `App`
-- New event handling in `handle_key_event()` for file finder navigation
-- New `keys.search.fields.open_file_finder` keybinding (default: `Tab`)
+- `FileFinderState` and `FileFinderTarget` added to `UIState` in `app.rs`
+- `OpenFileFinder` command added to `CommandSearchFocusFields` enum in `commands.rs`
+- `open_file_finder` keybinding added to `KeysSearchFocusFields` in `keys.rs` (default: `Ctrl+T`)
+- New event handling in `handle_file_finder_key()` for file finder navigation
+- File finder renders as an overlay popup in `view.rs`
 
 ---
 

@@ -1819,6 +1819,19 @@ impl<'a> App {
                 );
                 EventHandlingResult::Rerender
             }
+            CommandSearchFocusFields::OpenFileFinder => {
+                let target = match self.search_fields.highlighted_field().name {
+                    FieldName::IncludeFiles => Some(FileFinderTarget::IncludeFiles),
+                    FieldName::ExcludeFiles => Some(FileFinderTarget::ExcludeFiles),
+                    _ => None,
+                };
+                if let Some(target) = target {
+                    self.open_file_finder(target);
+                    EventHandlingResult::Rerender
+                } else {
+                    EventHandlingResult::None
+                }
+            }
             CommandSearchFocusFields::EnterChars(key_code, key_modifiers) => {
                 self.enter_chars_into_field(key_code, key_modifiers)
             }
@@ -2360,18 +2373,6 @@ impl<'a> App {
             // If we're in SearchFields focus, treat unmatched keys as text input
             if let Screen::SearchFields(state) = &self.ui_state.current_screen {
                 if state.focussed_section == FocussedSection::SearchFields {
-                    // Tab opens file finder for include/exclude fields (issue #7)
-                    if key_event.code == KeyCode::Tab {
-                        let target = match self.search_fields.highlighted_field().name {
-                            FieldName::IncludeFiles => Some(FileFinderTarget::IncludeFiles),
-                            FieldName::ExcludeFiles => Some(FileFinderTarget::ExcludeFiles),
-                            _ => None,
-                        };
-                        if let Some(target) = target {
-                            self.open_file_finder(target);
-                            return Right(EventHandlingResult::Rerender);
-                        }
-                    }
                     // Fall through to return Left(Command) below
                 } else {
                     // In results focus: forward unbound char keys to the search field

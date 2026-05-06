@@ -189,6 +189,8 @@ pub struct KeysSearchFocusFields {
     pub focus_next_field: Keys,
     /// Focus on the previous field
     pub focus_previous_field: Keys,
+    /// Open file finder popup (when focused on include/exclude fields)
+    pub open_file_finder: Keys,
 }
 
 impl Default for KeysSearchFocusFields {
@@ -198,6 +200,7 @@ impl Default for KeysSearchFocusFields {
             trigger_search: keys![KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE)],
             focus_next_field: keys![KeyEvent::new(KeyCode::Tab, KeyModifiers::NONE)],
             focus_previous_field: keys![KeyEvent::new(KeyCode::Tab, KeyModifiers::SHIFT)],
+            open_file_finder: keys![KeyEvent::new(KeyCode::Char('t'), KeyModifiers::CONTROL)],
         }
     }
 }

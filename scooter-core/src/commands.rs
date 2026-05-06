@@ -40,6 +40,7 @@ pub(crate) enum CommandSearchFocusFields {
     TriggerSearch,
     FocusNextField,
     FocusPreviousField,
+    OpenFileFinder,
     EnterChars(KeyCode, KeyModifiers),
 }
 
@@ -162,6 +163,7 @@ impl KeyMap {
                     focus_previous_field,
                     CommandSearchFocusFields::FocusPreviousField
                 ),
+                (open_file_finder, CommandSearchFocusFields::OpenFileFinder),
             ]
         );
 
