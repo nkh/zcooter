@@ -1,6 +1,6 @@
 use anyhow::anyhow;
 use etcetera::base_strategy::{BaseStrategy, choose_base_strategy};
-use serde::{Deserialize, Deserializer, de, Serialize};
+use serde::{Deserialize, Deserializer, de};
 use std::{
     fs,
     path::{Path, PathBuf},
@@ -268,6 +268,17 @@ pub struct SearchConfig {
     /// ```
     #[serde(default, deserialize_with = "deserialize_focus_fields")]
     pub focus_fields: Option<Vec<String>>,
+    /// External command to use for file selection instead of the built-in file finder.
+    /// The command is executed via `sh -c` with the search directory as the working directory.
+    /// Each line of stdout is treated as a file/directory path to include or exclude.
+    /// Set to `null` (or omit) to use the built-in file finder.
+    ///
+    /// Example — use fzf:
+    /// ```toml
+    /// [search]
+    /// file_finder_command = "fzf --multi"
+    /// ```
+    pub file_finder_command: Option<String>,
 }
 
 impl Default for SearchConfig {
@@ -276,6 +287,7 @@ impl Default for SearchConfig {
             disable_prepopulated_fields: true,
             interpret_escape_sequences: false,
             focus_fields: None,
+            file_finder_command: None,
         }
     }
 }

@@ -418,6 +418,31 @@ where
                 EventHandlingResult::Rerender => self.draw()?,
                 EventHandlingResult::Exit(results) => return Ok(results.map(|t| *t)),
                 EventHandlingResult::None => {}
+                EventHandlingResult::ExternalFileFinder {
+                    command,
+                    target,
+                    base_dir,
+                } => {
+                    self.tui.exit()?;
+                    let output = tokio::process::Command::new("sh")
+                        .arg("-c")
+                        .arg(&command)
+                        .current_dir(&base_dir)
+                        .output()
+                        .await
+                        .context("Failed to run external file finder command")?;
+                    self.tui.init()?;
+                    if output.status.success() {
+                        let stdout = String::from_utf8_lossy(&output.stdout);
+                        for line in stdout.lines() {
+                            let trimmed = line.trim();
+                            if !trimmed.is_empty() {
+                                self.app.insert_file_path(target, trimmed);
+                            }
+                        }
+                    }
+                    self.draw()?;
+                }
             }
         }
     }

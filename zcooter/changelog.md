@@ -6,7 +6,7 @@
 - **Compact layout** — borderless inline fields use the full terminal width. No wasted space on headers or footers.
 - **Inline toggles** — Fixed, Word, and Case sensitive toggles sit on the search row, saving vertical space.
 - **Opt-in replacement** — results start unselected. Press `Space` to toggle individual results (auto-advances), `Ctrl+W` to toggle all.
-- **File finder popup** — press `Ctrl+T` in the include/exclude fields to browse and pick files interactively. Configurable via `keys.search.fields.open_file_finder`.
+- **File finder popup** — press `Ctrl+T` in the include/exclude fields to browse and pick files interactively. Configurable via `keys.search.fields.open_file_finder`. Can be overridden with an external command via `search.file_finder_command` (e.g. `fzf --multi`).
 - **Fluid navigation** — Up/Down work from anywhere (fields or results). `Ctrl+Up/Down` jumps between files. `Ctrl+Left/Right` resizes the file column.
 - **Configurable keybindings** — remap any key via `[keys]` in `config.toml` (see README for full reference).
 - **Single-file mode** — pass a file path instead of a directory to search within one file.
@@ -49,3 +49,4 @@
 | `file_list_height` | `[preview]` | `5` | File list lines in narrow terminal layout |
 | `keys.*` | `[keys]` | — | Full keybinding customization (see README) |
 | `focus_fields` | `[search]` | — | Ordered list of focusable field names for Tab navigation (e.g. `["search", "replace", "fixed"]`) |
+| `file_finder_command` | `[search]` | — | External command for file selection (executed via `sh -c` in the search directory; each stdout line becomes a path). Set to `null` to use the built-in file finder. Example: `"fzf --multi"` |

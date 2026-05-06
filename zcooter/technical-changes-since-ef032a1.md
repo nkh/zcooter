@@ -92,11 +92,23 @@ New interactive file/directory browser for include/exclude fields:
 - Enter to select (appends comma-separated glob to field)
 - Esc to close
 
+### External file finder command
+When `search.file_finder_command` is set, the TUI suspends (restores terminal to normal mode), runs the command via `sh -c` in the search directory, captures stdout (one path per line), and inserts each path into the field. This allows using tools like `fzf`, `fd`, or custom scripts for file selection.
+
+Example config:
+```toml
+[search]
+file_finder_command = "fzf --multi"
+```
+
 ### Code changes
 - `FileFinderState` and `FileFinderTarget` added to `UIState` in `app.rs`
 - `OpenFileFinder` command added to `CommandSearchFocusFields` enum in `commands.rs`
 - `open_file_finder` keybinding added to `KeysSearchFocusFields` in `keys.rs` (default: `Ctrl+T`)
-- New event handling in `handle_file_finder_key()` for file finder navigation
+- `ExternalFileFinder` variant added to `EventHandlingResult` for TUI suspension protocol
+- `file_finder_command: Option<String>` added to `SearchConfig` in `config.rs`
+- `app_runner.rs` handles `ExternalFileFinder`: calls `tui.exit()`, spawns `tokio::process::Command`, calls `tui.init()`, then inserts paths via `App::insert_file_path()`
+- New event handling in `handle_file_finder_key()` for built-in file finder navigation
 - File finder renders as an overlay popup in `view.rs`
 
 ---

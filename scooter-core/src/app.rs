@@ -77,6 +77,13 @@ pub enum EventHandlingResult {
     Rerender,
     Exit(Option<Box<ExitState>>),
     None,
+    /// Request the TUI runner to suspend the terminal, run an external file finder
+    /// command, and insert the selected paths into the target field.
+    ExternalFileFinder {
+        command: String,
+        target: FileFinderTarget,
+        base_dir: PathBuf,
+    },
 }
 
 impl EventHandlingResult {
@@ -1826,8 +1833,20 @@ impl<'a> App {
                     _ => None,
                 };
                 if let Some(target) = target {
-                    self.open_file_finder(target);
-                    EventHandlingResult::Rerender
+                    if let Some(ref command) = self.config.search.file_finder_command {
+                        let base_dir = match &self.input_source {
+                            InputSource::Directory(dir) => dir.clone(),
+                            InputSource::Stdin(_) => PathBuf::from("."),
+                        };
+                        EventHandlingResult::ExternalFileFinder {
+                            command: command.clone(),
+                            target,
+                            base_dir,
+                        }
+                    } else {
+                        self.open_file_finder(target);
+                        EventHandlingResult::Rerender
+                    }
                 } else {
                     EventHandlingResult::None
                 }
@@ -2657,7 +2676,7 @@ impl<'a> App {
         }
     }
 
-    fn insert_file_path(&mut self, target: FileFinderTarget, path: &str) {
+    pub fn insert_file_path(&mut self, target: FileFinderTarget, path: &str) {
         let field = match target {
             FileFinderTarget::IncludeFiles => self.search_fields.include_files_mut(),
             FileFinderTarget::ExcludeFiles => self.search_fields.exclude_files_mut(),
