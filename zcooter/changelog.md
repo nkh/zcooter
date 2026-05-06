@@ -18,6 +18,8 @@
 - **`--no-file-filters` flag** — hides the include/exclude filter fields from the TUI, shrinking the field area from 4 rows to 2 rows (search + replace only). Tab navigation cycles cleanly through the remaining visible fields. The reclaimed space goes to the file list and preview.
 - **Substring file filter matching** — include/exclude filter values now match anywhere in the file path (e.g. `test` matches `src/test/main.rs`). Patterns containing `/` or `*` are treated as globs (e.g. `*.rs`, `src/`).
 - **Configurable `focus_fields`** — new `search.focus_fields` config option that defines an ordered list of field names for Tab navigation order. Accepted names: `search`, `replace`, `fixed`, `word`, `case`, `include`, `exclude`. When omitted, all fields are focusable in default order. Automatically integrates with `--no-file-filters` to remove hidden fields from the focus list.
+- **Default config template** — `default-config.toml` in the repo root contains all configuration sections and their default values, fully commented. Can be copied to `~/.config/scooter/config.toml` as a starting point.
+- **Vim bindings document** — `zcooter/vim-bindings.md` documents VimRun-based Vim/Neovim integration with `Scooter`, `VScooter` commands and leader-key mappings for opening scooter on the current file, git repo, or with a visual selection as search text.
 
 ## Bug Fixes
 
