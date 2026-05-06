@@ -97,6 +97,11 @@ struct Args {
     #[arg(long)]
     editor_command: Option<String>,
 
+    /// Number of lines for the file list in compact layout (narrow terminals, width <= 110).
+    /// Overrides the config file setting.
+    #[arg(long, name = "LINES")]
+    file_list_height: Option<u16>,
+
     // --- Initial values for fields ---
     //
     /// Text to search with
@@ -264,6 +269,7 @@ impl<'a> TryFrom<&'a Args> for AppConfig<'a> {
             },
             stdin_content,
             editor_command_override: args.editor_command.clone(),
+            file_list_height_override: args.file_list_height,
             interpret_escape_sequences_override: args.interpret_escape_sequences,
         })
     }
@@ -384,6 +390,7 @@ mod tests {
             files_to_exclude: None,
             config_dir: None,
             editor_command: None,
+            file_list_height: None,
         }
     }
 
