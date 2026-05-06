@@ -62,15 +62,16 @@ fn render_compact_search_fields(
     num_results: usize,
     num_files: usize,
     search_phase: Option<SearchPhase>,
+    show_file_filters: bool,
 ) {
     // Field indices: 0=Search, 1=Replace, 2=FixedStrings, 3=WholeWord, 4=MatchCase, 5=IncludeFiles, 6=ExcludeFiles
-    // Visual layout (4 rows):
+    // Visual layout (4 rows with file filters, 2 rows without):
     //   Row 0: search: <value>                    [X] fixed  [ ] word  [X] case sensitive
     //   Row 1: replace: <value>
-    //   Row 2: include: <value>
-    //   Row 3: exclude: <value>
+    //   Row 2: include: <value>   (only when show_file_filters)
+    //   Row 3: exclude: <value>   (only when show_file_filters)
 
-    let num_visual_rows: u16 = 4;
+    let num_visual_rows: u16 = if show_file_filters { 4 } else { 2 };
 
     for visual_row in 0..num_visual_rows {
         let y = area.y + visual_row;
@@ -2001,6 +2002,7 @@ pub fn render(app: &mut App, frame: &mut Frame<'_>) {
                 num_results,
                 num_files,
                 search_phase,
+                app.run_config.show_file_filters,
             );
 
             let search_is_empty = app.search_fields.search().text().is_empty();

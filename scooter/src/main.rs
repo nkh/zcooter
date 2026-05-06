@@ -93,6 +93,10 @@ struct Args {
     #[arg(long)]
     print_on_exit: bool,
 
+    /// Hide the include and exclude filter fields in the TUI
+    #[arg(long)]
+    no_file_filters: bool,
+
     /// Override the editor command for opening files (overrides config file setting). Use %file and %line as placeholders.
     #[arg(long)]
     editor_command: Option<String>,
@@ -270,6 +274,7 @@ impl<'a> TryFrom<&'a Args> for AppConfig<'a> {
                 immediate_replace: args.immediate_replace || immediate,
                 print_results: args.print_results || immediate,
                 print_on_exit: args.print_on_exit,
+                show_file_filters: !args.no_file_filters,
                 ..AppRunConfig::default()
             },
             stdin_content,
@@ -387,6 +392,7 @@ mod tests {
             no_tui: false,
             no_stdin: false,
             print_on_exit: false,
+            no_file_filters: false,
             search_text: None,
             replace_text: None,
             fixed_strings: false,

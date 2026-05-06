@@ -434,6 +434,11 @@ impl SearchFields {
         &mut TextField
     );
 
+    /// Create a default focus list: all fields 0..NUM_SEARCH_FIELDS.
+    fn default_focus_indices() -> Vec<usize> {
+        (0..NUM_SEARCH_FIELDS as usize).collect()
+    }
+
     #[allow(clippy::needless_pass_by_value)]
     pub fn with_values(
         search_field_values: &SearchFieldValues<'_>,
@@ -477,8 +482,9 @@ impl SearchFields {
             ),
         ];
 
+        let focus_indices = Self::default_focus_indices();
         Self {
-            highlighted: Self::initial_highlight_position(&fields, disable_prepopulated_fields),
+            highlighted: Self::initial_highlight_position(&fields, disable_prepopulated_fields, &focus_indices),
             fields,
         }
     }
@@ -486,20 +492,31 @@ impl SearchFields {
     fn initial_highlight_position(
         fields: &[SearchField],
         disable_prepopulated_fields: bool,
+        focus_indices: &[usize],
     ) -> usize {
+        if focus_indices.is_empty() {
+            return 0;
+        }
+
         if disable_prepopulated_fields {
-            fields
+            // Find the first focusable field that is NOT set by CLI
+            focus_indices
                 .iter()
-                .enumerate()
-                .find_map(|(idx, field)| if !field.set_by_cli { Some(idx) } else { None })
-                .unwrap_or(0)
+                .find(|&&idx| !fields[idx].set_by_cli)
+                .copied()
+                .unwrap_or(focus_indices[0])
         } else {
             // Fields are editable but search was pre-populated via CLI:
-            // focus the replace field so the user can start typing the replacement.
+            // focus the replace field if it's in the focus list, otherwise first focusable field.
             if fields[0].set_by_cli {
-                1
+                // Prefer replace (index 1) if it's in the focus list
+                if focus_indices.contains(&1) {
+                    1
+                } else {
+                    focus_indices[0]
+                }
             } else {
-                0
+                focus_indices[0]
             }
         }
     }
@@ -512,29 +529,54 @@ impl SearchFields {
         &mut self.fields[self.highlighted]
     }
 
-    fn focus_impl(&mut self, backward: bool, disable_prepopulated_fields: bool) {
-        let step = if backward {
-            self.fields.len().saturating_sub(1)
-        } else {
-            1
-        };
+    fn focus_impl(
+        &mut self,
+        backward: bool,
+        disable_prepopulated_fields: bool,
+        focus_indices: &[usize],
+    ) {
+        if focus_indices.is_empty() {
+            return;
+        }
 
-        let initial = self.highlighted;
-        let mut next = (initial + step).rem_euclid(self.fields.len());
+        // Find the current position within focus_indices
+        let current_pos = focus_indices
+            .iter()
+            .position(|&idx| idx == self.highlighted)
+            .unwrap_or(0);
+
+        let len = focus_indices.len();
+        let step = if backward { len.saturating_sub(1) } else { 1 };
+
+        let initial = current_pos;
+        let mut pos = (initial + step) % len;
+
+        // Skip CLI-locked fields
         if disable_prepopulated_fields {
-            while self.fields[next].set_by_cli && next != initial {
-                next = (next + step).rem_euclid(self.fields.len());
+            let mut safety = len;
+            while self.fields[focus_indices[pos]].set_by_cli && pos != initial && safety > 0 {
+                pos = (pos + step) % len;
+                safety -= 1;
             }
         }
-        self.highlighted = next;
+
+        self.highlighted = focus_indices[pos];
     }
 
-    pub fn focus_next(&mut self, disable_prepopulated_fields: bool) {
-        self.focus_impl(false, disable_prepopulated_fields);
+    pub fn focus_next(
+        &mut self,
+        disable_prepopulated_fields: bool,
+        focus_indices: &[usize],
+    ) {
+        self.focus_impl(false, disable_prepopulated_fields, focus_indices);
     }
 
-    pub fn focus_prev(&mut self, disable_prepopulated_fields: bool) {
-        self.focus_impl(true, disable_prepopulated_fields);
+    pub fn focus_prev(
+        &mut self,
+        disable_prepopulated_fields: bool,
+        focus_indices: &[usize],
+    ) {
+        self.focus_impl(true, disable_prepopulated_fields, focus_indices);
     }
 
     pub fn errors(&self) -> Vec<AppError> {
@@ -1051,26 +1093,27 @@ mod tests {
     #[test]
     fn test_search_fields() {
         let mut search_fields = SearchFields::with_values(&SearchFieldValues::default(), true);
+        let all_indices: Vec<usize> = (0..7).collect();
 
         // Test focus navigation
         assert_eq!(search_fields.highlighted, 0);
-        search_fields.focus_next(true);
+        search_fields.focus_next(true, &all_indices);
         assert_eq!(search_fields.highlighted, 1);
-        search_fields.focus_next(true);
+        search_fields.focus_next(true, &all_indices);
         assert_eq!(search_fields.highlighted, 2);
-        search_fields.focus_next(true);
+        search_fields.focus_next(true, &all_indices);
         assert_eq!(search_fields.highlighted, 3);
-        search_fields.focus_next(true);
+        search_fields.focus_next(true, &all_indices);
         assert_eq!(search_fields.highlighted, 4);
-        search_fields.focus_next(true);
+        search_fields.focus_next(true, &all_indices);
         assert_eq!(search_fields.highlighted, 5);
-        search_fields.focus_next(true);
+        search_fields.focus_next(true, &all_indices);
         assert_eq!(search_fields.highlighted, 6);
-        search_fields.focus_next(true);
+        search_fields.focus_next(true, &all_indices);
         assert_eq!(search_fields.highlighted, 0);
-        search_fields.focus_prev(true);
+        search_fields.focus_prev(true, &all_indices);
         assert_eq!(search_fields.highlighted, 6);
-        search_fields.focus_next(true);
+        search_fields.focus_next(true, &all_indices);
         assert_eq!(search_fields.highlighted, 0);
 
         for c in "test search".chars() {
@@ -1082,7 +1125,7 @@ mod tests {
         }
         assert_eq!(search_fields.search().text(), "test search");
 
-        search_fields.focus_next(true);
+        search_fields.focus_next(true, &all_indices);
         assert_eq!(search_fields.highlighted, 1);
         for c in "test replace".chars() {
             search_fields.highlighted_field_mut().handle_keys(
@@ -1093,7 +1136,7 @@ mod tests {
         }
         assert_eq!(search_fields.replace().text(), "test replace");
 
-        search_fields.focus_next(true);
+        search_fields.focus_next(true, &all_indices);
         assert_eq!(search_fields.highlighted, 2);
         search_fields.highlighted_field_mut().handle_keys(
             KeyCode::Char(' '),
@@ -1129,37 +1172,38 @@ mod tests {
             },
             true,
         );
+        let all_indices: Vec<usize> = (0..7).collect();
 
         assert_eq!(search_fields.highlighted, 1);
         assert_eq!(search_fields.highlighted_field().name, FieldName::Replace);
 
-        search_fields.focus_next(true);
+        search_fields.focus_next(true, &all_indices);
         assert_eq!(search_fields.highlighted, 3);
         assert_eq!(search_fields.highlighted_field().name, FieldName::WholeWord);
 
-        search_fields.focus_next(true);
+        search_fields.focus_next(true, &all_indices);
         assert_eq!(search_fields.highlighted, 4);
         assert_eq!(search_fields.highlighted_field().name, FieldName::MatchCase);
 
-        search_fields.focus_next(true);
+        search_fields.focus_next(true, &all_indices);
         assert_eq!(search_fields.highlighted, 6);
         assert_eq!(
             search_fields.highlighted_field().name,
             FieldName::ExcludeFiles
         );
 
-        search_fields.focus_next(true);
+        search_fields.focus_next(true, &all_indices);
         assert_eq!(search_fields.highlighted, 1);
         assert_eq!(search_fields.highlighted_field().name, FieldName::Replace);
 
-        search_fields.focus_prev(true);
+        search_fields.focus_prev(true, &all_indices);
         assert_eq!(search_fields.highlighted, 6);
         assert_eq!(
             search_fields.highlighted_field().name,
             FieldName::ExcludeFiles
         );
 
-        search_fields.focus_prev(true);
+        search_fields.focus_prev(true, &all_indices);
         assert_eq!(search_fields.highlighted, 4);
         assert_eq!(search_fields.highlighted_field().name, FieldName::MatchCase);
     }
@@ -1178,14 +1222,15 @@ mod tests {
             },
             false,
         );
+        let all_indices: Vec<usize> = (0..7).collect();
 
         assert_eq!(search_fields.highlighted, 0);
 
-        search_fields.focus_next(false);
+        search_fields.focus_next(false, &all_indices);
         assert_eq!(search_fields.highlighted, 1);
-        search_fields.focus_next(false);
+        search_fields.focus_next(false, &all_indices);
         assert_eq!(search_fields.highlighted, 2);
-        search_fields.focus_next(false);
+        search_fields.focus_next(false, &all_indices);
         assert_eq!(search_fields.highlighted, 3);
     }
 
@@ -1203,13 +1248,14 @@ mod tests {
             },
             true,
         );
+        let all_indices: Vec<usize> = (0..7).collect();
 
         assert_eq!(search_fields.highlighted, 0);
 
-        search_fields.focus_next(true);
+        search_fields.focus_next(true, &all_indices);
         assert_eq!(search_fields.highlighted, 0);
 
-        search_fields.focus_prev(true);
+        search_fields.focus_prev(true, &all_indices);
         assert_eq!(search_fields.highlighted, 0);
     }
 
@@ -1252,5 +1298,101 @@ mod tests {
 
         assert_eq!(search_fields.highlighted, 1);
         assert_eq!(search_fields.highlighted_field().name, FieldName::Replace);
+    }
+
+    #[test]
+    fn test_focus_next_with_custom_order() {
+        let mut search_fields = SearchFields::with_values(&SearchFieldValues::default(), true);
+        // Custom order: search, replace, include, exclude (skip toggles)
+        let custom_order: Vec<usize> = vec![0, 1, 5, 6];
+
+        assert_eq!(search_fields.highlighted, 0);
+        search_fields.focus_next(false, &custom_order);
+        assert_eq!(search_fields.highlighted, 1);
+        search_fields.focus_next(false, &custom_order);
+        assert_eq!(search_fields.highlighted, 5);
+        search_fields.focus_next(false, &custom_order);
+        assert_eq!(search_fields.highlighted, 6);
+        search_fields.focus_next(false, &custom_order);
+        assert_eq!(search_fields.highlighted, 0);
+    }
+
+    #[test]
+    fn test_focus_prev_with_custom_order() {
+        let mut search_fields = SearchFields::with_values(&SearchFieldValues::default(), true);
+        let custom_order: Vec<usize> = vec![0, 1, 5, 6];
+
+        // Start from highlighted=5 (include)
+        search_fields.highlighted = 5;
+        search_fields.focus_prev(false, &custom_order);
+        assert_eq!(search_fields.highlighted, 1);
+        search_fields.focus_prev(false, &custom_order);
+        assert_eq!(search_fields.highlighted, 0);
+        search_fields.focus_prev(false, &custom_order);
+        assert_eq!(search_fields.highlighted, 6);
+    }
+
+    #[test]
+    fn test_focus_skips_hidden_fields() {
+        let mut search_fields = SearchFields::with_values(&SearchFieldValues::default(), true);
+        // Only first 5 fields (no include/exclude)
+        let no_filters: Vec<usize> = vec![0, 1, 2, 3, 4];
+
+        assert_eq!(search_fields.highlighted, 0);
+        search_fields.focus_next(false, &no_filters);
+        assert_eq!(search_fields.highlighted, 1);
+        search_fields.focus_next(false, &no_filters);
+        assert_eq!(search_fields.highlighted, 2);
+        search_fields.focus_next(false, &no_filters);
+        assert_eq!(search_fields.highlighted, 3);
+        search_fields.focus_next(false, &no_filters);
+        assert_eq!(search_fields.highlighted, 4);
+        search_fields.focus_next(false, &no_filters);
+        // Wraps back to 0, skips 5 and 6
+        assert_eq!(search_fields.highlighted, 0);
+    }
+
+    #[test]
+    fn test_focus_with_empty_list_no_op() {
+        let mut search_fields = SearchFields::with_values(&SearchFieldValues::default(), true);
+        let empty: Vec<usize> = vec![];
+        search_fields.highlighted = 0;
+        search_fields.focus_next(false, &empty);
+        // Should be a no-op — stays on 0
+        assert_eq!(search_fields.highlighted, 0);
+        search_fields.focus_prev(false, &empty);
+        assert_eq!(search_fields.highlighted, 0);
+    }
+
+    #[test]
+    fn test_focus_initial_position_with_custom_list() {
+        let fields_vals = SearchFieldValues {
+            search: FieldValue::new("cli", true),
+            replace: FieldValue::new("", false),
+            fixed_strings: FieldValue::new(false, false),
+            match_whole_word: FieldValue::new(false, false),
+            match_case: FieldValue::new(true, false),
+            include_files: FieldValue::new("", false),
+            exclude_files: FieldValue::new("", false),
+        };
+        let fields = [
+            SearchField::new_text(FieldName::Search, fields_vals.search.value, fields_vals.search.set_by_cli),
+            SearchField::new_text(FieldName::Replace, fields_vals.replace.value, fields_vals.replace.set_by_cli),
+            SearchField::new_checkbox(FieldName::FixedStrings, fields_vals.fixed_strings.value, fields_vals.fixed_strings.set_by_cli),
+            SearchField::new_checkbox(FieldName::WholeWord, fields_vals.match_whole_word.value, fields_vals.match_whole_word.set_by_cli),
+            SearchField::new_checkbox(FieldName::MatchCase, fields_vals.match_case.value, fields_vals.match_case.set_by_cli),
+            SearchField::new_text(FieldName::IncludeFiles, fields_vals.include_files.value, fields_vals.include_files.set_by_cli),
+            SearchField::new_text(FieldName::ExcludeFiles, fields_vals.exclude_files.value, fields_vals.exclude_files.set_by_cli),
+        ];
+
+        // With custom list [0, 1, 2] and prepopulated search → should skip 0 (cli-locked), land on 1
+        let custom: Vec<usize> = vec![0, 1, 2];
+        let pos = SearchFields::initial_highlight_position(&fields, true, &custom);
+        assert_eq!(pos, 1);
+
+        // With list [2, 3] and prepopulated → should land on 2 (first in list)
+        let toggle_only: Vec<usize> = vec![2, 3];
+        let pos = SearchFields::initial_highlight_position(&fields, true, &toggle_only);
+        assert_eq!(pos, 2);
     }
 }

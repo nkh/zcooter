@@ -1,6 +1,6 @@
 use anyhow::anyhow;
 use etcetera::base_strategy::{BaseStrategy, choose_base_strategy};
-use serde::{Deserialize, Deserializer, de};
+use serde::{Deserialize, Deserializer, de, Serialize};
 use std::{
     fs,
     path::{Path, PathBuf},
@@ -208,6 +208,40 @@ fn detect_true_colour() -> bool {
     }
 }
 
+/// Deserializer for `focus_fields`: accepts `None` (field absent → None),
+/// or a list of valid field name strings. Returns `Some(Vec<String>>`.
+fn deserialize_focus_fields<'de, D>(deserializer: D) -> Result<Option<Vec<String>>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    use serde::de::Error;
+
+    let opt: Option<Vec<String>> = Option::deserialize(deserializer)?;
+    let valid = [
+        "search",
+        "replace",
+        "fixed",
+        "word",
+        "case",
+        "include",
+        "exclude",
+    ];
+
+    match opt {
+        None => Ok(None),
+        Some(ref list) => {
+            for name in list {
+                if !valid.contains(&name.as_str()) {
+                    return Err(D::Error::custom(format!(
+                        "unknown focus field \"{name}\". Valid values: {valid:?}"
+                    )));
+                }
+            }
+            Ok(Some(list.clone()))
+        }
+    }
+}
+
 #[derive(Debug, Deserialize, Clone, PartialEq)]
 #[serde(deny_unknown_fields, default)]
 pub struct SearchConfig {
@@ -216,6 +250,24 @@ pub struct SearchConfig {
     /// Whether to interpret escape sequences in replacement text. When enabled, `\n` becomes a newline,
     /// `\t` becomes a tab, and `\\` becomes a literal backslash. Defaults to `false`.
     pub interpret_escape_sequences: bool,
+    /// Ordered list of field names that receive focus during Tab navigation.
+    /// Fields not in this list are skipped entirely.
+    /// Accepted names: "search", "replace", "fixed", "word", "case", "include", "exclude".
+    /// When omitted (None), all fields are focusable in their default order.
+    ///
+    /// Example — skip include/exclude filters:
+    /// ```toml
+    /// [search]
+    /// focus_fields = ["search", "replace", "fixed", "word", "case"]
+    /// ```
+    ///
+    /// Example — custom tab order:
+    /// ```toml
+    /// [search]
+    /// focus_fields = ["search", "replace", "include", "exclude"]
+    /// ```
+    #[serde(default, deserialize_with = "deserialize_focus_fields")]
+    pub focus_fields: Option<Vec<String>>,
 }
 
 impl Default for SearchConfig {
@@ -223,6 +275,7 @@ impl Default for SearchConfig {
         Self {
             disable_prepopulated_fields: true,
             interpret_escape_sequences: false,
+            focus_fields: None,
         }
     }
 }
@@ -338,6 +391,7 @@ interpret_escape_sequences = true
                 search: SearchConfig {
                     disable_prepopulated_fields: false,
                     interpret_escape_sequences: true,
+                    focus_fields: None,
                 },
                 keys: KeysConfig::default(),
             }
@@ -556,5 +610,69 @@ move_bottom = "r"
             result.is_ok(),
             "r and R should be treated as different keys"
         );
+    }
+
+    #[test]
+    fn test_focus_fields_default_is_none() -> anyhow::Result<()> {
+        let config: Config = toml::from_str("")?;
+        assert_eq!(config.search.focus_fields, None);
+        Ok(())
+    }
+
+    #[test]
+    fn test_focus_fields_valid_list() -> anyhow::Result<()> {
+        let config: Config = toml::from_str(
+            r#"
+[search]
+focus_fields = ["search", "replace", "fixed", "word", "case"]
+"#,
+        )?;
+        assert_eq!(
+            config.search.focus_fields,
+            Some(vec![
+                "search".to_string(),
+                "replace".to_string(),
+                "fixed".to_string(),
+                "word".to_string(),
+                "case".to_string(),
+            ])
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_focus_fields_unknown_name_rejected() {
+        let result: Result<Config, _> = toml::from_str(
+            r#"
+[search]
+focus_fields = ["search", "foobar"]
+"#,
+        );
+        assert!(result.is_err());
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("unknown focus field \"foobar\"")
+        );
+    }
+
+    #[test]
+    fn test_focus_fields_custom_order() -> anyhow::Result<()> {
+        let config: Config = toml::from_str(
+            r#"
+[search]
+focus_fields = ["replace", "search", "include"]
+"#,
+        )?;
+        assert_eq!(
+            config.search.focus_fields,
+            Some(vec![
+                "replace".to_string(),
+                "search".to_string(),
+                "include".to_string(),
+            ])
+        );
+        Ok(())
     }
 }

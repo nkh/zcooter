@@ -664,6 +664,8 @@ pub struct AppRunConfig {
     pub print_results: bool,
     pub print_on_exit: bool,
     pub interpret_escape_sequences: bool,
+    /// When false, the include and exclude filter fields are hidden in the TUI.
+    pub show_file_filters: bool,
 }
 
 #[allow(clippy::derivable_impls)]
@@ -679,6 +681,7 @@ impl Default for AppRunConfig {
             print_results: false,
             print_on_exit: false,
             interpret_escape_sequences: false,
+            show_file_filters: true,
         }
     }
 }
@@ -775,6 +778,47 @@ pub struct App {
     /// Set to true when UI-level caches (file windows, diffs) should be cleared.
     /// The frontend checks and resets this flag.
     ui_caches_invalidated: bool,
+}
+
+impl App {
+    /// Returns the ordered list of field indices that should receive focus during Tab navigation.
+    /// Combines the config `focus_fields` setting with `show_file_filters`.
+    /// When `show_file_filters` is false, include/exclude are removed from the list.
+    /// When `focus_fields` is None, all fields (respecting show_file_filters) are in default order.
+    fn focus_field_indices(&self) -> Vec<usize> {
+        // Map from config field name to array index
+        let name_to_idx: &[(&str, usize)] = &[
+            ("search", 0),
+            ("replace", 1),
+            ("fixed", 2),
+            ("word", 3),
+            ("case", 4),
+            ("include", 5),
+            ("exclude", 6),
+        ];
+
+        let indices: Vec<usize> = if let Some(ref names) = self.config.search.focus_fields {
+            names
+                .iter()
+                .filter_map(|name| {
+                    name_to_idx
+                        .iter()
+                        .find(|(n, _)| *n == name.as_str())
+                        .map(|(_, idx)| *idx)
+                })
+                .collect()
+        } else {
+            // Default order: all fields
+            (0..7).collect()
+        };
+
+        // If file filters are hidden, filter out include (5) and exclude (6)
+        if self.run_config.show_file_filters {
+            indices
+        } else {
+            indices.into_iter().filter(|&i| i < 5).collect()
+        }
+    }
 }
 
 impl std::fmt::Debug for App {
@@ -1760,13 +1804,19 @@ impl<'a> App {
                 EventHandlingResult::Rerender
             }
             CommandSearchFocusFields::FocusPreviousField => {
-                self.search_fields
-                    .focus_prev(self.config.search.disable_prepopulated_fields);
+                let indices = self.focus_field_indices();
+                self.search_fields.focus_prev(
+                    self.config.search.disable_prepopulated_fields,
+                    &indices,
+                );
                 EventHandlingResult::Rerender
             }
             CommandSearchFocusFields::FocusNextField => {
-                self.search_fields
-                    .focus_next(self.config.search.disable_prepopulated_fields);
+                let indices = self.focus_field_indices();
+                self.search_fields.focus_next(
+                    self.config.search.disable_prepopulated_fields,
+                    &indices,
+                );
                 EventHandlingResult::Rerender
             }
             CommandSearchFocusFields::EnterChars(key_code, key_modifiers) => {
@@ -1959,6 +2009,11 @@ impl<'a> App {
     }
 
     fn focus_field(&mut self, field_index: usize) -> EventHandlingResult {
+        // Only focus the field if it's in the current focus list
+        let indices = self.focus_field_indices();
+        if !indices.contains(&field_index) {
+            return EventHandlingResult::None;
+        }
         let sfs = self
             .ui_state
             .current_screen
