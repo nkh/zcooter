@@ -134,6 +134,7 @@ impl KeyMap {
 Minimal changes:
 - `disable_prepopulated_fields` behavior is already config-driven, no change needed.
 - Compact labels ("search", "fixed", etc.) vs classic labels ("Search text", "Fixed strings") — could be driven by the layout enum.
+- **`focus_fields` config** (commit f4358ce): The new `search.focus_fields` option defines Tab navigation order per field name. In a dual-interface setup, the two layouts may want different default tab orders (e.g., classic has 7 rows with different priorities than compact's 4 rows). The focus list mechanism would need to accept layout-specific defaults or allow the user to set separate focus lists per layout. The `focus_impl()` and `focus_field_indices()` functions already decouple navigation from fixed sequential indices, making this extension straightforward — the default focus list just needs to be selected based on the active layout.
 
 ### 7. Replace State (`scooter-core/src/replace.rs`)
 

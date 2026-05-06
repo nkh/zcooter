@@ -15,6 +15,8 @@
 - **File/match counter** — the counter now shows `files/matches` (e.g. `3/42`) instead of just the match count.
 - **Configurable file list height** — `preview.file_list_height` in config or `--file-list-height N` on the CLI to control the compact (narrow terminal) layout.
 - **`--editable` / `-E` flag** — unlock CLI-pre-populated fields for editing in the TUI without changing the config.
+- **`--no-file-filters` flag** — hides the include/exclude filter fields from the TUI, shrinking the field area from 4 rows to 2 rows (search + replace only). Tab navigation cycles cleanly through the remaining visible fields.
+- **Configurable `focus_fields`** — new `search.focus_fields` config option that defines an ordered list of field names for Tab navigation order. Accepted names: `search`, `replace`, `fixed`, `word`, `case`, `include`, `exclude`. When omitted, all fields are focusable in default order. Automatically integrates with `--no-file-filters` to remove hidden fields from the focus list.
 
 ## Bug Fixes
 
@@ -37,6 +39,7 @@
 |------|-------|-------------|
 | `--file-list-height N` | — | Set file list height in compact/narrow layout |
 | `--editable` | `-E` | Allow editing of CLI-pre-populated fields |
+| `--no-file-filters` | — | Hide include/exclude filter fields from the TUI |
 
 ## New Config Options
 
@@ -45,3 +48,4 @@
 | `file_column_percentage` | `[preview]` | `25` | File column width as % (10–80) |
 | `file_list_height` | `[preview]` | `5` | File list lines in narrow terminal layout |
 | `keys.*` | `[keys]` | — | Full keybinding customization (see README) |
+| `focus_fields` | `[search]` | — | Ordered list of focusable field names for Tab navigation (e.g. `["search", "replace", "fixed"]`) |

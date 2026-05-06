@@ -305,6 +305,51 @@ All CI workflows removed:
 
 ---
 
+## 19. `--no-file-filters` Flag & Configurable `focus_fields` (commit f4358ce)
+
+### Before
+- All 7 field names were always present in the TUI (search, replace, fixed, word, case, include, exclude).
+- Tab navigation used sequential indices (`max_focusable_field()` returning a fixed upper bound) and simply cycled 0..=N.
+- Ctrl+S/R/I/E/T shortcuts jumped to fixed field indices unconditionally.
+
+### After
+
+#### `--no-file-filters` flag
+- New CLI flag that hides include/exclude filter fields from the TUI.
+- Field area shrinks from 4 rows to 2 rows (only `search:` and `replace:` shown).
+- `show_file_filters: bool` added to `AppRunConfig` (propagated from CLI flag).
+- `view.rs` conditionally skips rendering include/exclude rows when `show_file_filters` is false.
+- Tab navigation cleanly cycles through the remaining visible fields with no hidden fields to skip.
+
+#### `focus_fields` config option
+- New `search.focus_fields` config option: an ordered `Vec<String>` of field names defining Tab navigation order and which fields receive focus.
+- Accepted names: `"search"`, `"replace"`, `"fixed"`, `"word"`, `"case"`, `"include"`, `"exclude"`.
+- When omitted (`None`), all fields are focusable in default order.
+- `--no-file-filters` automatically removes `"include"` and `"exclude"` from the focus list.
+- Custom deserializer `deserialize_focus_fields` validates field names and rejects unknown names at config load time.
+
+#### `focus_field_indices()` replacing `max_focusable_field()`
+- Old approach: `max_focusable_field()` returned a fixed integer; Tab cycled 0..=N with skip logic for non-editable fields.
+- New approach: `focus_field_indices()` in `app.rs` computes an ordered list of focusable field indices from the `focus_fields` config (or default list).
+- Tab/Shift+Tab navigation uses this ordered list directly — no skip logic needed.
+
+#### `focus_impl()` in `fields.rs`
+- New `focus_impl()` method navigates using the focus list instead of sequential indices.
+- `focus_field()` now checks whether the target field index is in the focus list; if not, the call is a no-op.
+- Ctrl+S/R/I/E/T shortcuts each check focus list membership before moving focus.
+
+### Code changes
+
+| File | Changes |
+|------|----------|
+| `scooter/src/main.rs` | `--no-file-filters` CLI arg, `show_file_filters` in `AppRunConfig` |
+| `scooter-core/src/config.rs` | `focus_fields` field on `SearchConfig`, `deserialize_focus_fields` validator |
+| `scooter/src/ui/view.rs` | Conditional rendering of include/exclude rows based on `show_file_filters` |
+| `scooter-core/src/app.rs` | `focus_field_indices()` replacing `max_focusable_field()`, Tab/Shift+Tab uses focus list, Ctrl+ shortcuts check membership |
+| `scooter-core/src/fields.rs` | New `focus_impl()` for focus-list-based navigation, `focus_field()` membership check |
+
+---
+
 ## Summary of Changed Files
 
 | File | Lines changed | Nature |
@@ -313,13 +358,13 @@ All CI workflows removed:
 | `scooter/src/ui/view.rs` | +500/−300 | Complete UI rewrite (bordered → compact, unified layout) |
 | `scooter-core/src/config.rs` | +18 | New config options (file_column_percentage, file_list_height) |
 | `scooter-core/src/config/keys.rs` | +16 | Keybinding config support |
-| `scooter-core/src/fields.rs` | +14 | disable_prepopulated_fields support |
+| `scooter-core/src/fields.rs` | +14 | disable_prepopulated_fields support, `focus_impl()`, `focus_field()` membership check |
 | `scooter-core/src/replace.rs` | +15 | num_files tracking in ReplaceState/ReplaceStats |
 | `scooter-core/src/validation.rs` | +22 | Include filter fix, single-file validation |
 | `scooter-core/src/search.rs` | +6 | Minor adjustments |
 | `scooter-core/src/commands.rs` | +4 | Keybinding command support |
 | `scooter-core/tests/app.rs` | +5 | Test updates for new ReplaceState fields |
 | `scooter/src/app_runner.rs` | +25 | Cache clearing, CLI overrides, editor refresh |
-| `scooter/src/main.rs` | +38 | New CLI args, single-file mode, validation |
+| `scooter/src/main.rs` | +42 | New CLI args, single-file mode, validation, `--no-file-filters` |
 | `scooter/src/ui/cache.rs` | +16 | `clear_caches()` function |
 | `README.md` | +14/−? | Documentation updates |
