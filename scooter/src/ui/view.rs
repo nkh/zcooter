@@ -388,12 +388,13 @@ fn render_search_results(
     area_is_focussed: bool,
     wrap: bool,
     file_column_width_pct: u16,
+    file_list_height: u16,
 ) {
     let small_screen = area.width <= 110;
 
     let num_results = search_state.results.len();
     let num_to_render = if small_screen {
-        5
+        file_list_height as usize
     } else {
         area.height as usize
     };
@@ -2009,6 +2010,7 @@ pub fn render(app: &mut App, frame: &mut Frame<'_>) {
                     search_fields_state.focussed_section == FocussedSection::SearchResults,
                     app.config.preview.wrap_text,
                     search_fields_state.file_column_width_pct,
+                    app.config.preview.file_list_height,
                 );
             } else if search_is_empty {
                 // No search state and search is empty — show nothing in results area

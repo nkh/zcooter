@@ -131,6 +131,9 @@ pub struct PreviewConfig {
     /// The preview takes the remaining space. Defaults to `25` (i.e. preview is 75%).
     /// Adjustable at runtime with Ctrl+Left / Ctrl+Right.
     pub file_column_percentage: u16,
+    /// Number of lines shown in the file list when the terminal is too narrow
+    /// for a side-by-side layout (width <= 110). Defaults to `5`.
+    pub file_list_height: u16,
 }
 
 impl Default for PreviewConfig {
@@ -140,6 +143,7 @@ impl Default for PreviewConfig {
             syntax_highlighting_theme: load_theme("base16-eighties.dark").unwrap(),
             wrap_text: false,
             file_column_percentage: 25,
+            file_list_height: 5,
         }
     }
 }
@@ -328,6 +332,7 @@ interpret_escape_sequences = true
                     syntax_highlighting_theme: load_theme("Solarized (light)").unwrap(),
                     wrap_text: true,
                     file_column_percentage: 25,
+                    file_list_height: 5,
                 },
                 style: StyleConfig { true_color: false },
                 search: SearchConfig {
@@ -372,6 +377,7 @@ command = "vim %file +%line"
                 syntax_highlighting_theme: load_theme("base16-ocean.dark").unwrap(),
                 wrap_text: false,
                 file_column_percentage: 25,
+                file_list_height: 5,
             },
             style: StyleConfig::default(),
             search: SearchConfig::default(),
@@ -389,6 +395,7 @@ command = "vim %file +%line"
                 syntax_highlighting_theme: load_theme("base16-ocean.dark").unwrap(),
                 wrap_text: false,
                 file_column_percentage: 25,
+                file_list_height: 5,
             },
             style: StyleConfig::default(),
             search: SearchConfig::default(),
