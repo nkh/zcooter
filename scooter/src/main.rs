@@ -102,6 +102,11 @@ struct Args {
     #[arg(long, name = "LINES")]
     file_list_height: Option<u16>,
 
+    /// Allow editing of fields that were populated using CLI args (e.g. --search-text).
+    /// Overrides the `search.disable_prepopulated_fields` config setting.
+    #[arg(short = 'E', long, action = clap::ArgAction::SetTrue)]
+    editable: bool,
+
     // --- Initial values for fields ---
     //
     /// Text to search with
@@ -270,6 +275,7 @@ impl<'a> TryFrom<&'a Args> for AppConfig<'a> {
             stdin_content,
             editor_command_override: args.editor_command.clone(),
             file_list_height_override: args.file_list_height,
+            editable_override: args.editable,
             interpret_escape_sequences_override: args.interpret_escape_sequences,
         })
     }
@@ -391,6 +397,7 @@ mod tests {
             config_dir: None,
             editor_command: None,
             file_list_height: None,
+            editable: false,
         }
     }
 

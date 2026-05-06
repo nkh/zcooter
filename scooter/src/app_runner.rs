@@ -49,6 +49,7 @@ pub struct AppConfig<'a> {
     pub stdin_content: Option<String>,
     pub editor_command_override: Option<String>,
     pub file_list_height_override: Option<u16>,
+    pub editable_override: bool,
     pub interpret_escape_sequences_override: bool,
 }
 
@@ -62,6 +63,7 @@ impl Default for AppConfig<'_> {
             stdin_content: None,
             editor_command_override: None,
             file_list_height_override: None,
+            editable_override: false,
             interpret_escape_sequences_override: false,
         }
     }
@@ -142,6 +144,11 @@ impl AppRunner<CrosstermBackend<io::Stdout>, CrosstermEventStream, NoOpSnapshotP
         // Apply CLI override for file list height if provided
         if let Some(file_list_height) = app_config.file_list_height_override {
             user_config.preview.file_list_height = file_list_height;
+        }
+
+        // Apply CLI override for editable prepopulated fields
+        if app_config.editable_override {
+            user_config.search.disable_prepopulated_fields = false;
         }
 
         // Apply CLI override for escape sequences
