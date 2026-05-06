@@ -230,7 +230,7 @@ By default, scooter looks for a TOML configuration file at:
 - Linux or macOS: `~/.config/scooter/config.toml`
 - Windows: `%AppData%\scooter\config.toml`
 
-You can override the config directory by using the `--config-dir` flag.
+You can override the config directory by using the `--config-dir` flag, or point to a specific config file with `--config <file>`.
 
 The following options can be set in your configuration file:
 
@@ -285,6 +285,11 @@ Width of the file name column as a percentage of the results area (10–80).
 The preview takes the remaining space. Defaults to `25` (i.e. preview is 75%).
 Adjustable at runtime with Ctrl+Left / Ctrl+Right.
 
+#### `file_list_height`
+
+Number of lines shown in the file list when the terminal is too narrow
+for a side-by-side layout (width <= 110). Defaults to `5`.
+
 ### `[style]` section
 
 #### `true_color`
@@ -302,6 +307,38 @@ Whether to disable fields set by CLI flags. Set to `false` to allow editing of t
 
 Whether to interpret escape sequences in replacement text. When enabled, `\n` becomes a newline,
 `\t` becomes a tab, and `\\` becomes a literal backslash. Defaults to `false`.
+
+#### `focus_fields`
+
+Ordered list of field names that receive focus during Tab navigation.
+Fields not in this list are skipped entirely.
+Accepted names: "search", "replace", "fixed", "word", "case", "include", "exclude".
+When omitted (None), all fields are focusable in their default order.
+
+Example — skip include/exclude filters:
+```toml
+[search]
+focus_fields = ["search", "replace", "fixed", "word", "case"]
+```
+
+Example — custom tab order:
+```toml
+[search]
+focus_fields = ["search", "replace", "include", "exclude"]
+```
+
+#### `file_finder_command`
+
+External command to use for file selection instead of the built-in file finder.
+The command is executed via `sh -c` with the search directory as the working directory.
+Each line of stdout is treated as a file/directory path to include or exclude.
+Set to `null` (or omit) to use the built-in file finder.
+
+Example — use fzf:
+```toml
+[search]
+file_finder_command = "fzf --multi"
+```
 
 <!-- CONFIG END -->
 
@@ -330,11 +367,12 @@ unlock_prepopulated_fields = "A-u"  # Allow editing of fields that were populate
 trigger_search = "enter"            # Trigger a search
 focus_next_field = "tab"            # Focus on the next field
 focus_previous_field = "S-tab"      # Focus on the previous field
+open_file_finder = "A-f"            # Open file finder popup (when focused on include/exclude fields)
 
 # Commands available on the search screen, when the search results are focussed
 [keys.search.results]
 trigger_replacement = "enter"              # Trigger a replacement
-back_to_fields = ["esc", "C-o"]            # Move focus back to the search fields
+back_to_fields = "C-o"                     # Move focus back to the search fields
 open_in_editor = "e"                       # Open the currently selected search result in your editor. The editor command can be overriden using the `editor_open` section of your config.
 move_down = ["j", "C-n", "down"]           # Navigate to the search result below (wraps to top at end)
 move_up = ["k", "C-p", "up"]               # Navigate to the search result above (wraps to bottom at top)

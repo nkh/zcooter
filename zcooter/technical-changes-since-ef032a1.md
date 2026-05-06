@@ -382,3 +382,87 @@ All CI workflows removed:
 | `scooter/src/main.rs` | +42 | New CLI args, single-file mode, validation, `--no-file-filters` |
 | `scooter/src/ui/cache.rs` | +16 | `clear_caches()` function |
 | `README.md` | +14/−? | Documentation updates |
+
+---
+
+## 20. Substring File Filter Matching (commit prior to session)
+
+### Before
+Include/exclude filter values were passed directly to ripgrep as globs. A value like `test` would not match `src/test/main.rs` — you had to write `**/test/**`.
+
+### After
+Filter values now match anywhere in the file path (substring matching). `test` matches `src/test/main.rs`. Patterns containing `/` or `*` are still treated as globs for full control.
+
+### Code changes
+- Filter matching logic in `scooter-core/src/validation.rs` — wraps non-glob patterns in `**/*pattern*/**`
+
+---
+
+## 21. Escape Key Delay Fix (commit prior to session)
+
+### Before
+Pressing `Esc` while focused on search results had a ~100ms delay before triggering `back_to_fields`, due to terminal escape sequence disambiguation (the terminal waits to see if more bytes follow `0x1b`).
+
+### After
+Removed `Esc` from the `back_to_fields` keybinding. Use `Ctrl+O` instead. Removed the stale escape deprecation popup that was shown when Esc was pressed on the results screen.
+
+### Code changes
+- `KeysSearchFocusResults::default()` — removed `KeyCode::Esc` from `back_to_fields` keys
+
+---
+
+## 22. File Finder Key Conflict Fix (commit 7034ada)
+
+### Bug
+`open_file_finder` and `toggle_hidden_files` both defaulted to `Ctrl+T`. Since `toggle_hidden_files` lives in `search_common` (checked first in `KeyMap::lookup`), `Ctrl+T` always toggled hidden files and never opened the file finder.
+
+### Fix
+Changed `open_file_finder` default from `Ctrl+T` to `Alt+F`. The conflict was not caught by the conflict detector because it only checks within a single keymap, not across `search_common` and `search_fields`.
+
+### Code changes
+- `scooter-core/src/config/keys.rs` — `open_file_finder` default: `KeyCode::Char('t'), CONTROL` → `KeyCode::Char('f'), ALT`
+
+---
+
+## 23. External File Finder & CLI Options (commits 40b79ba + session)
+
+### Before
+File finder was only available as the built-in directory browser.
+
+### After
+- `search.file_finder_command` config option — when set, `Alt+F` (or custom key) suspends the TUI, runs an external command via `sh -c`, and inserts returned paths into the field
+- `--file-finder-command CMD` CLI arg — overrides the config setting
+- `--open-file-finder-key KEY` CLI arg — overrides the file finder keybinding
+
+### Code changes
+
+| File | Changes |
+|------|----------|
+| `scooter-core/src/config.rs` | `file_finder_command: Option<String>` on `SearchConfig` |
+| `scooter-core/src/app.rs` | `ExternalFileFinder` variant in `EventHandlingResult`; `insert_file_path()` made `pub` |
+| `scooter/src/app_runner.rs` | TUI suspend/resume for external file finder; CLI override application |
+| `scooter/src/main.rs` | `--file-finder-command`, `--open-file-finder-key` CLI args |
+
+---
+
+## 24. `--config` CLI Option (commit c7a4241)
+
+### Before
+Only `--config-dir` was available to override the config directory.
+
+### After
+New `--config <FILE>` flag that specifies an exact config file path instead of the default `config.toml`. If the specified file doesn't exist, an error is returned (unlike the default location which silently falls back to built-in defaults).
+
+### Code changes
+
+| File | Changes |
+|------|----------|
+| `scooter-core/src/config.rs` | `CONFIG_FILE_OVERRIDE` OnceLock, `set_config_file_override()`, `config_file()` checks override, `load_config()` errors on missing explicit file |
+| `scooter/src/main.rs` | `--config` CLI arg, sets override in `main()` |
+
+---
+
+## 25. Default Config Template (commit 31a5582)
+
+### New file
+`default-config.toml` — complete template with all configuration sections and their default values, fully commented and documented. Can be copied to `~/.config/scooter/config.toml` as a starting point.

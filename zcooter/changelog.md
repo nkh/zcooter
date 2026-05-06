@@ -6,7 +6,7 @@
 - **Compact layout** — borderless inline fields use the full terminal width. No wasted space on headers or footers.
 - **Inline toggles** — Fixed, Word, and Case sensitive toggles sit on the search row, saving vertical space.
 - **Opt-in replacement** — results start unselected. Press `Space` to toggle individual results (auto-advances), `Ctrl+W` to toggle all.
-- **File finder popup** — press `Ctrl+T` in the include/exclude fields to browse and pick files interactively. Configurable via `keys.search.fields.open_file_finder`. Can be overridden with an external command via `search.file_finder_command` (e.g. `fzf --multi`).
+- **File finder popup** — press `Alt+F` in the include/exclude fields to browse and pick files interactively. Configurable via `keys.search.fields.open_file_finder`. Can be overridden with an external command via `search.file_finder_command` (e.g. `fzf --multi`).
 - **Fluid navigation** — Up/Down work from anywhere (fields or results). `Ctrl+Up/Down` jumps between files. `Ctrl+Left/Right` resizes the file column.
 - **Configurable keybindings** — remap any key via `[keys]` in `config.toml` (see README for full reference).
 - **Single-file mode** — pass a file path instead of a directory to search within one file.
@@ -28,6 +28,7 @@
 - Fixed replacement not clearing search and replacement text after completion.
 - Fixed blank lines appearing when `--no-file-filters` is set (space now reclaimed by file list/preview).
 - Fixed escape key delay when navigating back from results to fields — removed `Esc` from `back_to_fields` binding (use `Ctrl+O` instead). The delay was caused by terminal escape sequence disambiguation (~100ms). Removed the stale escape deprecation popup.
+- Fixed file finder key (`Ctrl+T`) conflicting with `toggle_hidden_files` (same default key). Changed file finder default to `Alt+F`.
 
 ## Breaking Changes
 
@@ -44,7 +45,8 @@
 | `--editable` | `-E` | Allow editing of CLI-pre-populated fields |
 | `--no-file-filters` | — | Hide include/exclude filter fields from the TUI |
 | `--file-finder-command CMD` | — | External command for file selection in include/exclude fields (overrides config) |
-| `--open-file-finder-key KEY` | — | Key that opens the file finder in include/exclude fields (e.g. `"C-t"`) |
+| `--open-file-finder-key KEY` | — | Key that opens the file finder in include/exclude fields (e.g. `"A-f"`) |
+| `--config FILE` | — | Use the specified config file instead of the default config.toml |
 
 ## New Config Options
 
