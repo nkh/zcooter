@@ -494,7 +494,13 @@ impl SearchFields {
                 .find_map(|(idx, field)| if !field.set_by_cli { Some(idx) } else { None })
                 .unwrap_or(0)
         } else {
-            0
+            // Fields are editable but search was pre-populated via CLI:
+            // focus the replace field so the user can start typing the replacement.
+            if fields[0].set_by_cli {
+                1
+            } else {
+                0
+            }
         }
     }
 
@@ -1244,7 +1250,7 @@ mod tests {
             false,
         );
 
-        assert_eq!(search_fields.highlighted, 0);
-        assert_eq!(search_fields.highlighted_field().name, FieldName::Search);
+        assert_eq!(search_fields.highlighted, 1);
+        assert_eq!(search_fields.highlighted_field().name, FieldName::Replace);
     }
 }
