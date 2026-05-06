@@ -60,6 +60,7 @@ fn render_compact_search_fields(
     is_focussed: bool,
     area: Rect,
     num_results: usize,
+    num_files: usize,
     search_phase: Option<SearchPhase>,
 ) {
     // Field indices: 0=Search, 1=Replace, 2=FixedStrings, 3=WholeWord, 4=MatchCase, 5=IncludeFiles, 6=ExcludeFiles
@@ -162,13 +163,13 @@ fn render_compact_search_fields(
                 }
 
                 // Calculate spacer to push toggles to the right edge, leaving room for file count
-                // Reserve 8 chars for the match count so toggles don't shift when it changes
-                const COUNT_WIDTH: usize = 8;
+                // Reserve 12 chars for the file/match count so toggles don't shift when it changes
+                const COUNT_WIDTH: usize = 12;
                 let count_str: String = match search_phase {
                     Some(SearchPhase::Running { .. }) => "searching..".to_string(),
                     Some(SearchPhase::Invalid) => "[invalid]".to_string(),
                     Some(SearchPhase::Complete { .. }) => {
-                        format!("({num_results:>6})")
+                        format!("{num_files}/{num_results}")
                     }
                     _ => String::new(),
                 };
@@ -1976,9 +1977,18 @@ pub fn render(app: &mut App, frame: &mut Frame<'_>) {
             ])
             .areas(content_area);
 
-            let (num_results, search_phase) = match &search_fields_state.search_state {
-                Some(state) => (state.results.len(), Some(state.phase)),
-                None => (0, None),
+            let (num_results, num_files, search_phase) = match &search_fields_state.search_state {
+                Some(state) => (
+                    state.results.len(),
+                    state
+                        .results
+                        .iter()
+                        .filter_map(|r| r.search_result.path.as_ref())
+                        .collect::<std::collections::HashSet<_>>()
+                        .len(),
+                    Some(state.phase),
+                ),
+                None => (0, 0, None),
             };
 
             render_compact_search_fields(
@@ -1989,6 +1999,7 @@ pub fn render(app: &mut App, frame: &mut Frame<'_>) {
                 fields_focussed,
                 fields_area,
                 num_results,
+                num_files,
                 search_phase,
             );
 
