@@ -252,7 +252,6 @@ impl Default for KeysSearchFocusResults {
         Self {
             trigger_replacement: keys![KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE)],
             back_to_fields: keys![
-                KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE),
                 KeyEvent::new(KeyCode::Char('o'), KeyModifiers::CONTROL),
             ],
             open_in_editor: keys![KeyEvent::new(KeyCode::Char('e'), KeyModifiers::NONE)],

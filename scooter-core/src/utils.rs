@@ -405,7 +405,14 @@ pub fn add_overrides(
     for file in files.split(',') {
         let file = file.trim();
         if !file.is_empty() {
-            overrides.add(&format!("{prefix}{file}"))?;
+            // If the pattern doesn't already contain glob metacharacters (/ or *),
+            // wrap it in **/*...* so it matches anywhere in the file path.
+            let pattern = if file.contains('/') || file.contains('*') {
+                file.to_owned()
+            } else {
+                format!("**/*{file}*")
+            };
+            overrides.add(&format!("{prefix}{pattern}"))?;
         }
     }
     Ok(())

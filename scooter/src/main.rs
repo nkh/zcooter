@@ -111,6 +111,19 @@ struct Args {
     #[arg(short = 'E', long, action = clap::ArgAction::SetTrue)]
     editable: bool,
 
+    /// External command for file selection in include/exclude fields (executed via sh -c).
+    /// Overrides the `search.file_finder_command` config setting.
+    /// Each line of stdout is treated as a file path to include or exclude.
+    /// Example: --file-finder-command "fzf --multi"
+    #[arg(long)]
+    file_finder_command: Option<String>,
+
+    /// Key that opens the file finder in include/exclude fields.
+    /// Overrides the `keys.search.fields.open_file_finder` config setting.
+    /// Uses the same key name format as the config file (e.g. "C-t", "enter", "f9").
+    #[arg(long)]
+    open_file_finder_key: Option<String>,
+
     // --- Initial values for fields ---
     //
     /// Text to search with
@@ -282,6 +295,8 @@ impl<'a> TryFrom<&'a Args> for AppConfig<'a> {
             file_list_height_override: args.file_list_height,
             editable_override: args.editable,
             interpret_escape_sequences_override: args.interpret_escape_sequences,
+            file_finder_command_override: args.file_finder_command.clone(),
+            open_file_finder_key_override: args.open_file_finder_key.clone(),
         })
     }
 }

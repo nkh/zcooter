@@ -15,7 +15,8 @@
 - **File/match counter** — the counter now shows `files/matches` (e.g. `3/42`) instead of just the match count.
 - **Configurable file list height** — `preview.file_list_height` in config or `--file-list-height N` on the CLI to control the compact (narrow terminal) layout.
 - **`--editable` / `-E` flag** — unlock CLI-pre-populated fields for editing in the TUI without changing the config.
-- **`--no-file-filters` flag** — hides the include/exclude filter fields from the TUI, shrinking the field area from 4 rows to 2 rows (search + replace only). Tab navigation cycles cleanly through the remaining visible fields.
+- **`--no-file-filters` flag** — hides the include/exclude filter fields from the TUI, shrinking the field area from 4 rows to 2 rows (search + replace only). Tab navigation cycles cleanly through the remaining visible fields. The reclaimed space goes to the file list and preview.
+- **Substring file filter matching** — include/exclude filter values now match anywhere in the file path (e.g. `test` matches `src/test/main.rs`). Patterns containing `/` or `*` are treated as globs (e.g. `*.rs`, `src/`).
 - **Configurable `focus_fields`** — new `search.focus_fields` config option that defines an ordered list of field names for Tab navigation order. Accepted names: `search`, `replace`, `fixed`, `word`, `case`, `include`, `exclude`. When omitted, all fields are focusable in default order. Automatically integrates with `--no-file-filters` to remove hidden fields from the focus list.
 
 ## Bug Fixes
@@ -25,6 +26,8 @@
 - Fixed include filter not restricting results to matching files only.
 - Fixed missing space between the case sensitive toggle and the match count.
 - Fixed replacement not clearing search and replacement text after completion.
+- Fixed blank lines appearing when `--no-file-filters` is set (space now reclaimed by file list/preview).
+- Fixed escape key delay when navigating back from results to fields — removed `Esc` from `back_to_fields` binding (use `Ctrl+O` instead). The delay was caused by terminal escape sequence disambiguation (~100ms). Removed the stale escape deprecation popup.
 
 ## Breaking Changes
 
@@ -40,6 +43,8 @@
 | `--file-list-height N` | — | Set file list height in compact/narrow layout |
 | `--editable` | `-E` | Allow editing of CLI-pre-populated fields |
 | `--no-file-filters` | — | Hide include/exclude filter fields from the TUI |
+| `--file-finder-command CMD` | — | External command for file selection in include/exclude fields (overrides config) |
+| `--open-file-finder-key KEY` | — | Key that opens the file finder in include/exclude fields (e.g. `"C-t"`) |
 
 ## New Config Options
 

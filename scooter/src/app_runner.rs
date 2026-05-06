@@ -51,6 +51,8 @@ pub struct AppConfig<'a> {
     pub file_list_height_override: Option<u16>,
     pub editable_override: bool,
     pub interpret_escape_sequences_override: bool,
+    pub file_finder_command_override: Option<String>,
+    pub open_file_finder_key_override: Option<String>,
 }
 
 impl Default for AppConfig<'_> {
@@ -65,6 +67,8 @@ impl Default for AppConfig<'_> {
             file_list_height_override: None,
             editable_override: false,
             interpret_escape_sequences_override: false,
+            file_finder_command_override: None,
+            open_file_finder_key_override: None,
         }
     }
 }
@@ -154,6 +158,21 @@ impl AppRunner<CrosstermBackend<io::Stdout>, CrosstermEventStream, NoOpSnapshotP
         // Apply CLI override for escape sequences
         if app_config.interpret_escape_sequences_override {
             user_config.search.interpret_escape_sequences = true;
+        }
+
+        // Apply CLI override for file finder command if provided
+        if let Some(ref cmd) = app_config.file_finder_command_override {
+            user_config.search.file_finder_command = Some(cmd.clone());
+        }
+
+        // Apply CLI override for file finder key if provided
+        if let Some(ref key_str) = app_config.open_file_finder_key_override {
+            use scooter_core::config::Keys;
+            let key = key_str
+                .parse::<scooter_core::keyboard::KeyEvent>()
+                .map(|k| Keys::new(vec![k]))
+                .map_err(|e| anyhow::anyhow!("Invalid key '{key_str}': {e}"))?;
+            user_config.keys.search.fields.open_file_finder = key;
         }
 
         // Initialize runtime config from user config file

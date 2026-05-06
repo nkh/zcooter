@@ -1970,8 +1970,8 @@ pub fn render(app: &mut App, frame: &mut Frame<'_>) {
             let has_replacement_progress = search_fields_state.replacement_progress.is_some();
             let fields_focussed = search_fields_state.focussed_section == FocussedSection::SearchFields;
 
-            // Compact layout: 4 visual rows (Search+toggles, Replace, Include, Exclude)
-            let fields_height: u16 = 4;
+            // Compact layout: 4 visual rows with file filters, 2 without
+            let fields_height: u16 = if app.run_config.show_file_filters { 4 } else { 2 };
             let [fields_area, results_area] = Layout::vertical([
                 Constraint::Length(fields_height),
                 Constraint::Fill(1),
