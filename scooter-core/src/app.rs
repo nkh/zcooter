@@ -116,6 +116,10 @@ pub enum BackgroundProcessingEvent {
 pub enum AppEvent {
     PerformSearch { generation: u64 },
     DismissToast { generation: u64 },
+    /// Re-run the current search because the on-disk file contents may have
+    /// changed since the last search was performed (e.g. the user saved the
+    /// file in their editor while zcooter was open).
+    RetrySearch,
 }
 
 #[derive(Debug)]
@@ -1217,6 +1221,14 @@ impl<'a> App {
             }
             AppEvent::DismissToast { generation } => {
                 self.dismiss_toast_if_generation_matches(generation);
+                EventHandlingResult::Rerender
+            }
+            AppEvent::RetrySearch => {
+                if self.searcher.is_some() {
+                    self.file_content_provider.clear();
+                    self.request_ui_cache_clear();
+                    self.perform_search_already_validated();
+                }
                 EventHandlingResult::Rerender
             }
         }

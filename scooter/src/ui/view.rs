@@ -9,8 +9,8 @@ use ratatui::{
 };
 use scooter_core::{
     app::{
-        App, Event, FocussedSection, FileFinderState, InputSource, Popup, Screen, SearchPhase,
-        SearchState,
+        App, AppEvent, Event, FocussedSection, FileFinderState, InputSource, InternalEvent, Popup,
+        Screen, SearchPhase, SearchState,
     },
     diff::{Diff, DiffColour, line_diff},
     errors::AppError,
@@ -472,7 +472,7 @@ fn render_search_results(
                 &preview,
                 theme,
                 true_colour,
-                event_sender,
+                event_sender.clone(),
                 if wrap {
                     WrapText::Width {
                         width: preview_area.width,
@@ -486,6 +486,12 @@ fn render_search_results(
                     frame.render_widget(preview, preview_area);
                 }
                 Err(e) => {
+                    let msg = e.to_string();
+                    if msg.contains("File has changed since search") {
+                        let _ = event_sender.send(Event::Internal(InternalEvent::App(
+                            AppEvent::RetrySearch,
+                        )));
+                    }
                     frame.render_widget(
                         Paragraph::new(format!("Error generating preview: {e}")).fg(Color::Red),
                         preview_area,
