@@ -375,6 +375,25 @@ impl SearchState {
             .for_each(|res| res.search_result.included = !all_included);
     }
 
+    fn toggle_current_file_selected(&mut self) {
+        if self.results.is_empty() {
+            return;
+        }
+        let current_path = self.results[self.primary_selected_pos()]
+            .search_result
+            .path
+            .clone();
+        let all_included = self
+            .results
+            .iter()
+            .filter(|r| r.search_result.path == current_path)
+            .all(|r| r.search_result.included);
+        self.results
+            .iter_mut()
+            .filter(|r| r.search_result.path == current_path)
+            .for_each(|r| r.search_result.included = !all_included);
+    }
+
     // TODO: add tests
     fn selected_range(&self) -> (usize, usize) {
         match &self.selected {
@@ -749,6 +768,7 @@ pub struct UIState {
     toast: Option<Toast>,
     errors: Vec<AppError>,
     hints: HintState,
+    pub pending_prefix: Option<KeyEvent>,
 }
 
 impl UIState {
@@ -760,6 +780,7 @@ impl UIState {
             toast: None,
             errors: Vec::new(),
             hints: HintState::default(),
+            pending_prefix: None,
         }
     }
 
@@ -1843,6 +1864,34 @@ impl<'a> App {
                     EventHandlingResult::None
                 }
             }
+            CommandSearchFocusFields::FocusSearchField => self.focus_field(0),
+            CommandSearchFocusFields::FocusReplaceField => self.focus_field(1),
+            CommandSearchFocusFields::FocusIncludeField => self.focus_field(5),
+            CommandSearchFocusFields::FocusExcludeField => self.focus_field(6),
+            CommandSearchFocusFields::FocusFixedField => self.focus_field(2),
+            CommandSearchFocusFields::FieldsToResults => {
+                // Switch from fields focus to results focus
+                if let Screen::SearchFields(ref state) = self.ui_state.current_screen {
+                    let has_results = state
+                        .search_state
+                        .as_ref()
+                        .map_or(false, |s| !s.results.is_empty());
+                    if has_results {
+                        let sfs = self
+                            .ui_state
+                            .current_screen
+                            .unwrap_search_fields_state_mut();
+                        sfs.focussed_section = FocussedSection::SearchResults;
+                        // Up key → jump to last entry, Down key → stay at first entry
+                        // We don't know which key triggered this, so just keep current pos
+                        EventHandlingResult::Rerender
+                    } else {
+                        EventHandlingResult::None
+                    }
+                } else {
+                    EventHandlingResult::None
+                }
+            }
             CommandSearchFocusFields::EnterChars(key_code, key_modifiers) => {
                 self.enter_chars_into_field(key_code, key_modifiers)
             }
@@ -2024,6 +2073,7 @@ impl<'a> App {
             .expect("Focussed on search results but search_state is None")
     }
 
+    #[allow(dead_code)]
     fn get_search_state_if_results(&mut self) -> Option<&mut SearchState> {
         if let Screen::SearchFields(ref mut state) = self.ui_state.current_screen {
             state.search_state.as_mut()
@@ -2151,6 +2201,24 @@ impl<'a> App {
                 self.get_search_state_unwrap().flip_multiselect_direction();
                 EventHandlingResult::Rerender
             }
+            CommandSearchFocusResults::ToggleCurrentFileSelected => {
+                self.get_search_state_unwrap().toggle_current_file_selected();
+                EventHandlingResult::Rerender
+            }
+            CommandSearchFocusResults::EnterInsertMode => {
+                // Switch from results focus to fields focus
+                let sfs = self
+                    .ui_state
+                    .current_screen
+                    .unwrap_search_fields_state_mut();
+                sfs.focussed_section = FocussedSection::SearchFields;
+                EventHandlingResult::Rerender
+            }
+            CommandSearchFocusResults::BackspaceToSearch => {
+                // Focus the search field and delete the last character
+                self.focus_field(0);
+                self.enter_chars_into_field(KeyCode::Backspace, KeyModifiers::NONE)
+            }
         }
     }
 
@@ -2223,6 +2291,22 @@ impl<'a> App {
                         );
                         self.handle_replacement_config_change()
                     }
+                    CommandSearchFields::ResizeColumnShrink => {
+                        let sfs = self
+                            .ui_state
+                            .current_screen
+                            .unwrap_search_fields_state_mut();
+                        sfs.file_column_width_pct = sfs.file_column_width_pct.saturating_sub(3).clamp(10, 80);
+                        EventHandlingResult::Rerender
+                    }
+                    CommandSearchFields::ResizeColumnGrow => {
+                        let sfs = self
+                            .ui_state
+                            .current_screen
+                            .unwrap_search_fields_state_mut();
+                        sfs.file_column_width_pct = sfs.file_column_width_pct.saturating_add(3).clamp(10, 80);
+                        EventHandlingResult::Rerender
+                    }
                     CommandSearchFields::SearchFocusFields(command) => {
                         if !matches!(
                             search_fields_state.focussed_section,
@@ -2274,83 +2358,12 @@ impl<'a> App {
             return Right(self.handle_file_finder_key(key_event));
         }
 
-        // Global shortcuts that work regardless of focus
-        if key_event.modifiers.contains(KeyModifiers::CONTROL) {
-            if let KeyCode::Char(ch) = key_event.code {
-                match ch {
-                    'w' => {
-                        // Ctrl+W: toggle all files (works from any focus)
-                        if let Some(state) = self.get_search_state_if_results() {
-                            state.toggle_all_selected();
-                            return Right(EventHandlingResult::Rerender);
-                        }
-                    }
-                    's' => {
-                        // Ctrl+S: focus search field
-                        return Right(self.focus_field(0));
-                    }
-                    'r' => {
-                        // Ctrl+R: focus replace field
-                        return Right(self.focus_field(1));
-                    }
-                    'i' => {
-                        // Ctrl+I: focus include field
-                        return Right(self.focus_field(5));
-                    }
-                    'e' => {
-                        // Ctrl+E: focus exclude field
-                        return Right(self.focus_field(6));
-                    }
-                    't' => {
-                        // Ctrl+T: focus fixed field (first toggle)
-                        return Right(self.focus_field(2));
-                    }
-                    _ => {}
-                }
+        // Handle pending prefix key
+        if let Some(prefix_key) = self.ui_state.pending_prefix.take() {
+            if let Some(command) = self.key_map.lookup_prefix(prefix_key, key_event) {
+                return Left(command);
             }
-
-            // Ctrl+Left / Ctrl+Right: resize file name column
-            if key_event.code == KeyCode::Left || key_event.code == KeyCode::Right {
-                if let Screen::SearchFields(ref mut sfs) = self.ui_state.current_screen {
-                    let step: u16 = 3; // percentage points per key press
-                    let new_pct = if key_event.code == KeyCode::Left {
-                        sfs.file_column_width_pct.saturating_sub(step)
-                    } else {
-                        sfs.file_column_width_pct.saturating_add(step)
-                    };
-                    sfs.file_column_width_pct = new_pct.clamp(10, 80);
-                    return Right(EventHandlingResult::Rerender);
-                }
-            }
-        }
-
-        // Up/Down arrows: when focused on fields, transition into results
-        // Up → last entry, Down → first entry
-        if !key_event.modifiers.contains(KeyModifiers::CONTROL)
-            && !key_event.modifiers.contains(KeyModifiers::ALT)
-        {
-            if matches!(key_event.code, KeyCode::Up) || matches!(key_event.code, KeyCode::Down) {
-                if let Screen::SearchFields(ref state) = self.ui_state.current_screen {
-                    if state.focussed_section == FocussedSection::SearchFields {
-                        let has_results = state
-                            .search_state
-                            .as_ref()
-                            .map_or(false, |s| !s.results.is_empty());
-                        if has_results {
-                            let sfs = self
-                                .ui_state
-                                .current_screen
-                                .unwrap_search_fields_state_mut();
-                            sfs.focussed_section = FocussedSection::SearchResults;
-                            // Up → jump to last entry, Down → stay at first entry
-                            if matches!(key_event.code, KeyCode::Up) {
-                                self.get_search_state_unwrap().move_selected_bottom();
-                            }
-                            return Right(EventHandlingResult::Rerender);
-                        }
-                    }
-                }
-            }
+            // No match for prefix combo — fall through to normal processing
         }
 
         let maybe_event = self
@@ -2361,10 +2374,6 @@ impl<'a> App {
         if !matches!(maybe_event, Some(Command::General(CommandGeneral::Quit))) {
             if self.ui_state.popup.is_some() {
                 self.clear_popup();
-                return Right(EventHandlingResult::Rerender);
-            }
-            if key_event.code == KeyCode::Esc && self.multiselect_enabled() {
-                self.toggle_multiselect_mode();
                 return Right(EventHandlingResult::Rerender);
             }
         }
@@ -2405,6 +2414,22 @@ impl<'a> App {
                 CommandSearchFocusFields::EnterChars(key_event.code, key_event.modifiers),
             ))
         };
+
+        // If no command was found, check if this key is a prefix for any binding
+        if matches!(event, Command::SearchFields(CommandSearchFields::SearchFocusFields(
+            CommandSearchFocusFields::EnterChars(_, _)
+        ))) {
+            // Only check prefix for raw char keys with no modifiers
+            if key_event.prefix.is_none()
+                && !key_event.modifiers.contains(KeyModifiers::CONTROL)
+                && !key_event.modifiers.contains(KeyModifiers::ALT)
+                && matches!(key_event.code, KeyCode::Char(':'))
+            {
+                self.ui_state.pending_prefix = Some(key_event);
+                return Right(EventHandlingResult::None);
+            }
+        }
+
         Left(event)
     }
 
@@ -2990,6 +3015,7 @@ impl<'a> App {
             .collect()
     }
 
+    #[allow(dead_code)]
     fn multiselect_enabled(&self) -> bool {
         match &self.ui_state.current_screen {
             Screen::SearchFields(SearchFieldsState {
@@ -3000,6 +3026,7 @@ impl<'a> App {
         }
     }
 
+    #[allow(dead_code)]
     fn toggle_multiselect_mode(&mut self) {
         match &mut self.ui_state.current_screen {
             Screen::SearchFields(SearchFieldsState {

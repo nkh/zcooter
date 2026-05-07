@@ -1,0 +1,64 @@
+# Zcooter vim-style key bindings
+# Copy this file to ~/.config/scooter/config.toml to use it
+
+[keys.general]
+# Quit with :q (prefix-key sequence) or C-c
+quit = [":q", "C-c"]
+# Reset with :r
+reset = ":r"
+# Help with :h or ?
+show_help_menu = [":h", "?"]
+
+[keys.search]
+toggle_preview_wrapping = "zl"
+toggle_hidden_files = "zh"
+toggle_multiline = "zm"
+toggle_interpret_escape_sequences = "ze"
+resize_column_shrink = ["C-left", "<"]
+resize_column_grow = ["C-right", ">"]
+
+[keys.search.fields]
+trigger_search = "enter"
+focus_next_field = "tab"
+focus_previous_field = "S-tab"
+unlock_prepopulated_fields = "A-u"
+open_file_finder = "A-f"
+# Vim-style field focusing
+focus_search_field = "/"
+focus_replace_field = "%"
+focus_include_field = "A-i"
+focus_exclude_field = "A-e"
+focus_fixed_field = "zf"
+fields_to_results = ["down", "up"]
+
+[keys.search.results]
+# Navigation (vim-like with arrow fallbacks)
+move_down = ["j", "C-n", "down"]
+move_up = ["k", "C-p", "up"]
+move_next_file = ["C-down", "J"]
+move_prev_file = ["C-up", "K"]
+move_down_half_page = "C-d"
+move_up_half_page = "C-u"
+move_down_full_page = ["C-f", "pagedown"]
+move_up_full_page = ["C-b", "pageup"]
+move_top = ["g", "home"]
+move_bottom = ["G", "end"]
+
+# Mode switching
+back_to_fields = "C-o"
+enter_insert_mode = "i"
+backspace_to_search = "backspace"
+
+# Actions
+trigger_replacement = "enter"
+open_in_editor = [":e", "e"]
+toggle_selected_inclusion = " "
+toggle_all_selected = "a"
+toggle_current_file_selected = "*"
+toggle_multiselect_mode = "v"
+flip_multiselect_direction = "o"
+
+[keys.results]
+scroll_errors_down = ["j", "down", "C-n"]
+scroll_errors_up = ["k", "up", "C-p"]
+quit = ["enter", "q"]

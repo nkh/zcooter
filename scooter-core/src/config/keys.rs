@@ -151,6 +151,10 @@ pub struct KeysSearch {
     pub toggle_multiline: Keys,
     /// Toggle interpretation of escape sequences in replacement text (\n becomes newline, \t becomes tab, \\ becomes backslash)
     pub toggle_interpret_escape_sequences: Keys,
+    /// Shrink the file name column width
+    pub resize_column_shrink: Keys,
+    /// Grow the file name column width
+    pub resize_column_grow: Keys,
     #[serde(default)]
     /// Commands available on the search screen, when the search fields are focussed
     pub fields: KeysSearchFocusFields,
@@ -172,6 +176,8 @@ impl Default for KeysSearch {
                 KeyCode::Char('e'),
                 KeyModifiers::ALT
             )],
+            resize_column_shrink: keys![KeyEvent::new(KeyCode::Left, KeyModifiers::CONTROL)],
+            resize_column_grow: keys![KeyEvent::new(KeyCode::Right, KeyModifiers::CONTROL)],
             fields: KeysSearchFocusFields::default(),
             results: KeysSearchFocusResults::default(),
         }
@@ -191,6 +197,18 @@ pub struct KeysSearchFocusFields {
     pub focus_previous_field: Keys,
     /// Open file finder popup (when focused on include/exclude fields)
     pub open_file_finder: Keys,
+    /// Focus the search field
+    pub focus_search_field: Keys,
+    /// Focus the replace field
+    pub focus_replace_field: Keys,
+    /// Focus the include files field
+    pub focus_include_field: Keys,
+    /// Focus the exclude files field
+    pub focus_exclude_field: Keys,
+    /// Focus the fixed strings toggle
+    pub focus_fixed_field: Keys,
+    /// Switch focus from fields to results
+    pub fields_to_results: Keys,
 }
 
 impl Default for KeysSearchFocusFields {
@@ -201,6 +219,15 @@ impl Default for KeysSearchFocusFields {
             focus_next_field: keys![KeyEvent::new(KeyCode::Tab, KeyModifiers::NONE)],
             focus_previous_field: keys![KeyEvent::new(KeyCode::Tab, KeyModifiers::SHIFT)],
             open_file_finder: keys![KeyEvent::new(KeyCode::Char('f'), KeyModifiers::ALT)],
+            focus_search_field: keys![KeyEvent::new(KeyCode::Char('s'), KeyModifiers::CONTROL)],
+            focus_replace_field: keys![KeyEvent::new(KeyCode::Char('r'), KeyModifiers::CONTROL)],
+            focus_include_field: keys![KeyEvent::new(KeyCode::Char('i'), KeyModifiers::CONTROL)],
+            focus_exclude_field: keys![KeyEvent::new(KeyCode::Char('e'), KeyModifiers::CONTROL)],
+            focus_fixed_field: keys![KeyEvent::new(KeyCode::Char('t'), KeyModifiers::CONTROL)],
+            fields_to_results: keys![
+                KeyEvent::new(KeyCode::Down, KeyModifiers::NONE),
+                KeyEvent::new(KeyCode::Up, KeyModifiers::NONE),
+            ],
         }
     }
 }
@@ -245,6 +272,13 @@ pub struct KeysSearchFocusResults {
 
     /// Flip the direction of the multiselect selection
     pub flip_multiselect_direction: Keys,
+
+    /// Toggle all results in the current file
+    pub toggle_current_file_selected: Keys,
+    /// Switch to fields focus (insert mode)
+    pub enter_insert_mode: Keys,
+    /// Focus search field and delete last char
+    pub backspace_to_search: Keys,
 }
 
 impl Default for KeysSearchFocusResults {
@@ -286,6 +320,9 @@ impl Default for KeysSearchFocusResults {
             toggle_multiselect_mode: keys![KeyEvent::new(KeyCode::Char('v'), KeyModifiers::NONE)],
 
             flip_multiselect_direction: keys![KeyEvent::new(KeyCode::Char(';'), KeyModifiers::ALT)],
+            toggle_current_file_selected: keys![KeyEvent::new(KeyCode::Char('*'), KeyModifiers::NONE)],
+            enter_insert_mode: keys![KeyEvent::new(KeyCode::Char('i'), KeyModifiers::NONE)],
+            backspace_to_search: keys![KeyEvent::new(KeyCode::Backspace, KeyModifiers::NONE)],
         }
     }
 }

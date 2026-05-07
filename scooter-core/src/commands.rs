@@ -14,6 +14,42 @@ pub(crate) enum Command {
     Results(CommandResults),
 }
 
+impl From<CommandGeneral> for Command {
+    fn from(c: CommandGeneral) -> Self {
+        Command::General(c)
+    }
+}
+
+impl From<CommandSearchFields> for Command {
+    fn from(c: CommandSearchFields) -> Self {
+        Command::SearchFields(c)
+    }
+}
+
+impl From<CommandSearchFocusFields> for Command {
+    fn from(c: CommandSearchFocusFields) -> Self {
+        Command::SearchFields(CommandSearchFields::SearchFocusFields(c))
+    }
+}
+
+impl From<CommandSearchFocusResults> for Command {
+    fn from(c: CommandSearchFocusResults) -> Self {
+        Command::SearchFields(CommandSearchFields::SearchFocusResults(c))
+    }
+}
+
+impl From<CommandPerformingReplacement> for Command {
+    fn from(c: CommandPerformingReplacement) -> Self {
+        Command::PerformingReplacement(c)
+    }
+}
+
+impl From<CommandResults> for Command {
+    fn from(c: CommandResults) -> Self {
+        Command::Results(c)
+    }
+}
+
 // Events applicable to all screens
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(crate) enum CommandGeneral {
@@ -29,6 +65,8 @@ pub(crate) enum CommandSearchFields {
     ToggleHiddenFiles,
     ToggleMultiline,
     ToggleInterpretEscapeSequences,
+    ResizeColumnShrink,
+    ResizeColumnGrow,
     SearchFocusFields(CommandSearchFocusFields),
     SearchFocusResults(CommandSearchFocusResults),
 }
@@ -41,6 +79,12 @@ pub(crate) enum CommandSearchFocusFields {
     FocusNextField,
     FocusPreviousField,
     OpenFileFinder,
+    FocusSearchField,
+    FocusReplaceField,
+    FocusIncludeField,
+    FocusExcludeField,
+    FocusFixedField,
+    FieldsToResults,
     EnterChars(KeyCode, KeyModifiers),
 }
 
@@ -67,6 +111,9 @@ pub(crate) enum CommandSearchFocusResults {
     ToggleMultiselectMode,
 
     FlipMultiselectDirection,
+    ToggleCurrentFileSelected,
+    EnterInsertMode,
+    BackspaceToSearch,
 }
 
 // Events applicable only to `PerformingReplacement` screen
@@ -90,6 +137,8 @@ pub(crate) struct KeyMap {
     #[allow(clippy::zero_sized_map_values)]
     performing_replacement: HashMap<KeyEvent, CommandPerformingReplacement>,
     results: HashMap<KeyEvent, CommandResults>,
+    /// Map for prefix-key sequences: (prefix_key, second_key) -> Command
+    prefix_map: HashMap<(KeyEvent, KeyEvent), Command>,
 }
 
 /// Represents a key binding conflict detected during `KeyMap` construction
@@ -111,18 +160,26 @@ impl KeyMap {
                 let context = stringify!($($path).+);
                 let config = &keys_config.$($path).+;
                 let mut map = HashMap::new();
+                let mut prefix_entries: Vec<(KeyEvent, KeyEvent, Command)> = Vec::new();
                 $(
                     for key in &config.$field {
-                        Self::insert_and_detect(&mut map, *key, $command, context, $conflicts);
+                        if key.prefix.is_some() {
+                            // Prefix keys go into the prefix map
+                            let prefix_key = KeyEvent::new(key.prefix.unwrap(), KeyModifiers::NONE);
+                            let second_key = KeyEvent::new(key.code, key.modifiers);
+                            prefix_entries.push((prefix_key, second_key, Command::from($command)));
+                        } else {
+                            Self::insert_and_detect(&mut map, *key, $command, context, $conflicts);
+                        }
                     }
                 )*
-                map
+                (map, prefix_entries)
             }};
         }
 
         let mut conflicts = Vec::new();
 
-        let general = build_map!(
+        let general_map = build_map!(
             general,
             &mut conflicts,
             [
@@ -131,8 +188,9 @@ impl KeyMap {
                 (show_help_menu, CommandGeneral::ShowHelpMenu),
             ]
         );
+        let general = general_map.0;
 
-        let search_common = build_map!(
+        let search_common_map = build_map!(
             search,
             &mut conflicts,
             [
@@ -146,10 +204,13 @@ impl KeyMap {
                     toggle_interpret_escape_sequences,
                     CommandSearchFields::ToggleInterpretEscapeSequences
                 ),
+                (resize_column_shrink, CommandSearchFields::ResizeColumnShrink),
+                (resize_column_grow, CommandSearchFields::ResizeColumnGrow),
             ]
         );
+        let search_common = search_common_map.0;
 
-        let search_fields = build_map!(
+        let search_fields_map = build_map!(
             search.fields,
             &mut conflicts,
             [
@@ -164,10 +225,17 @@ impl KeyMap {
                     CommandSearchFocusFields::FocusPreviousField
                 ),
                 (open_file_finder, CommandSearchFocusFields::OpenFileFinder),
+                (focus_search_field, CommandSearchFocusFields::FocusSearchField),
+                (focus_replace_field, CommandSearchFocusFields::FocusReplaceField),
+                (focus_include_field, CommandSearchFocusFields::FocusIncludeField),
+                (focus_exclude_field, CommandSearchFocusFields::FocusExcludeField),
+                (focus_fixed_field, CommandSearchFocusFields::FocusFixedField),
+                (fields_to_results, CommandSearchFocusFields::FieldsToResults),
             ]
         );
+        let search_fields = search_fields_map.0;
 
-        let search_results = build_map!(
+        let search_results_map = build_map!(
             search.results,
             &mut conflicts,
             [
@@ -209,10 +277,17 @@ impl KeyMap {
                     flip_multiselect_direction,
                     CommandSearchFocusResults::FlipMultiselectDirection
                 ),
+                (
+                    toggle_current_file_selected,
+                    CommandSearchFocusResults::ToggleCurrentFileSelected
+                ),
+                (enter_insert_mode, CommandSearchFocusResults::EnterInsertMode),
+                (backspace_to_search, CommandSearchFocusResults::BackspaceToSearch),
             ]
         );
+        let search_results = search_results_map.0;
 
-        let results = build_map!(
+        let results_map = build_map!(
             results,
             &mut conflicts,
             [
@@ -221,9 +296,58 @@ impl KeyMap {
                 (quit, CommandResults::Quit),
             ]
         );
+        let results = results_map.0;
 
         #[allow(clippy::zero_sized_map_values)]
         let performing_replacement = HashMap::new();
+
+        // Collect all prefix entries into the prefix map
+        let mut prefix_map: HashMap<(KeyEvent, KeyEvent), Command> = HashMap::new();
+        for (prefix, second, cmd) in general_map.1 {
+            Self::insert_prefix_and_detect(
+                &mut prefix_map,
+                prefix,
+                second,
+                cmd,
+                &mut conflicts,
+            );
+        }
+        for (prefix, second, cmd) in search_common_map.1 {
+            Self::insert_prefix_and_detect(
+                &mut prefix_map,
+                prefix,
+                second,
+                cmd,
+                &mut conflicts,
+            );
+        }
+        for (prefix, second, cmd) in search_fields_map.1 {
+            Self::insert_prefix_and_detect(
+                &mut prefix_map,
+                prefix,
+                second,
+                cmd,
+                &mut conflicts,
+            );
+        }
+        for (prefix, second, cmd) in search_results_map.1 {
+            Self::insert_prefix_and_detect(
+                &mut prefix_map,
+                prefix,
+                second,
+                cmd,
+                &mut conflicts,
+            );
+        }
+        for (prefix, second, cmd) in results_map.1 {
+            Self::insert_prefix_and_detect(
+                &mut prefix_map,
+                prefix,
+                second,
+                cmd,
+                &mut conflicts,
+            );
+        }
 
         if conflicts.is_empty() {
             Ok(Self {
@@ -233,9 +357,36 @@ impl KeyMap {
                 search_common,
                 performing_replacement,
                 results,
+                prefix_map,
             })
         } else {
             Err(conflicts)
+        }
+    }
+
+    /// Insert a prefix-key binding and detect conflicts
+    fn insert_prefix_and_detect(
+        map: &mut HashMap<(KeyEvent, KeyEvent), Command>,
+        prefix: KeyEvent,
+        second: KeyEvent,
+        command: Command,
+        conflicts: &mut Vec<KeyConflict>,
+    ) {
+        let key = (prefix, second);
+        if let Some(existing) = map.insert(key, command) {
+            let format_command = |cmd: &Command| -> String {
+                format!("{cmd:?}").to_lowercase()
+            };
+            // Create a combined KeyEvent display for the conflict
+            let combined = KeyEvent::with_prefix(prefix.code, second.code);
+            conflicts.push(KeyConflict {
+                key: combined,
+                context: "prefix keys".to_string(),
+                commands: vec![
+                    format_command(&existing),
+                    format_command(map.get(&key).unwrap()),
+                ],
+            });
         }
     }
 
@@ -275,6 +426,21 @@ impl KeyMap {
                 ],
             });
         }
+    }
+
+    /// Look up a prefix-key sequence command
+    pub(crate) fn lookup_prefix(
+        &self,
+        prefix: KeyEvent,
+        key: KeyEvent,
+    ) -> Option<Command> {
+        self.prefix_map.get(&(prefix, key)).copied()
+    }
+
+    /// Check if any command starts with the given prefix key
+    #[allow(dead_code)]
+    pub(crate) fn has_prefix_for(&self, prefix: KeyEvent) -> bool {
+        self.prefix_map.keys().any(|(p, _)| *p == prefix)
     }
 
     /// Look up a command for the given key event and screen context

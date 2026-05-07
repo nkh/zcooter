@@ -92,6 +92,10 @@ toggle_hidden_files = "C-t"
 toggle_multiline = "A-m"
 # Toggle escape sequence interpretation in replacement text
 toggle_interpret_escape_sequences = "A-e"
+# Shrink file name column width
+resize_column_shrink = "C-left"
+# Grow file name column width
+resize_column_grow = "C-right"
 
 [keys.search.fields]
 # Allow editing of CLI-prepopulated fields
@@ -104,6 +108,18 @@ focus_next_field = "tab"
 focus_previous_field = "S-tab"
 # Open file finder popup (include/exclude fields only)
 open_file_finder = "A-f"
+# Focus the search field
+focus_search_field = "C-s"
+# Focus the replace field
+focus_replace_field = "C-r"
+# Focus the include files field
+focus_include_field = "C-i"
+# Focus the exclude files field
+focus_exclude_field = "C-e"
+# Focus the fixed strings toggle
+focus_fixed_field = "C-t"
+# Switch from fields focus to results focus
+fields_to_results = ["down", "up"]
 
 [keys.search.results]
 # Trigger replacement
@@ -130,6 +146,13 @@ toggle_selected_inclusion = " "
 toggle_all_selected = "C-w"
 toggle_multiselect_mode = "v"
 flip_multiselect_direction = "A-;"
+
+# File-level selection
+toggle_current_file_selected = "*"
+
+# Mode switching
+enter_insert_mode = "i"
+backspace_to_search = "backspace"
 
 [keys.performing_replacement]
 # (no keybindings defined for this screen)

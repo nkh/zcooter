@@ -423,12 +423,28 @@ pub(crate) mod keys {
 pub struct KeyEvent {
     pub code: KeyCode,
     pub modifiers: KeyModifiers,
+    /// Optional prefix key for two-key sequences (e.g. `:` in `:q`).
+    /// When set, this key event represents a sequence like prefix+code.
+    pub prefix: Option<KeyCode>,
     // TODO: crossterm now supports kind & state if terminal supports kitty's extended protocol
 }
 
 impl KeyEvent {
     pub fn new(code: KeyCode, modifiers: KeyModifiers) -> Self {
-        Self { code, modifiers }
+        Self {
+            code,
+            modifiers,
+            prefix: None,
+        }
+    }
+
+    /// Create a key event with a prefix for two-key sequences.
+    pub fn with_prefix(prefix: KeyCode, code: KeyCode) -> Self {
+        Self {
+            code,
+            modifiers: KeyModifiers::NONE,
+            prefix: Some(prefix),
+        }
     }
 
     /// Canonicalize the key event by removing the SHIFT modifier from character keys.
@@ -460,6 +476,41 @@ const MODIFIERS: [(KeyModifiers, &str); 3] = [
 impl std::fmt::Display for KeyEvent {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut result = String::new();
+
+        // Prefix key sequences are displayed as ":x"
+        if let Some(prefix) = self.prefix {
+            result.push(':');
+            match prefix {
+                KeyCode::Char(c) => result.push(c),
+                _ => {
+                    // For non-char prefixes, use the Display of the code alone
+                    let prefix_event = KeyEvent {
+                        code: prefix,
+                        modifiers: KeyModifiers::NONE,
+                        prefix: None,
+                    };
+                    result.push_str(&prefix_event.to_string());
+                }
+            }
+            result.push_str("-");
+            // Don't add modifiers for prefix sequences
+            match self.code {
+                KeyCode::Char(c) => result.push(c),
+                KeyCode::F(n) => {
+                    use std::fmt::Write;
+                    write!(&mut result, "F{n}").unwrap();
+                }
+                _ => {
+                    let code_event = KeyEvent {
+                        code: self.code,
+                        modifiers: KeyModifiers::NONE,
+                        prefix: None,
+                    };
+                    result.push_str(&code_event.to_string());
+                }
+            }
+            return write!(f, "{result}");
+        }
 
         for (modifier, str) in MODIFIERS {
             if self.modifiers.contains(modifier) {
@@ -547,6 +598,25 @@ impl std::str::FromStr for KeyEvent {
 
     #[allow(clippy::too_many_lines)]
     fn from_str(s: &str) -> Result<Self, Self::Err> {
+        // Handle prefix-key sequences: ":x" where x is a single character
+        if let Some(rest) = s.strip_prefix(':') {
+            let chars: Vec<char> = rest.chars().collect();
+            if chars.len() == 1 {
+                let prefix = KeyCode::Char(':');
+                let code = match chars[0] {
+                    c if c.is_ascii_lowercase() => KeyCode::Char(c),
+                    c if c.is_ascii_uppercase() => KeyCode::Char(c),
+                    _ => return Err(anyhow!("Invalid character after ':' prefix: '{rest}'")),
+                };
+                return Ok(KeyEvent {
+                    code,
+                    modifiers: KeyModifiers::NONE,
+                    prefix: Some(prefix),
+                });
+            }
+            // If more than one char after ':', fall through to normal parsing
+        }
+
         let mut tokens: Vec<_> = s.split('-').collect();
         let mut code = match tokens.pop().ok_or_else(|| anyhow!("Missing key code"))? {
             keys::BACKSPACE => KeyCode::Backspace,
@@ -618,6 +688,7 @@ impl std::str::FromStr for KeyEvent {
                     return Ok(KeyEvent {
                         code: KeyCode::Char('-'),
                         modifiers: KeyModifiers::empty(),
+                        prefix: None,
                     });
                 } else {
                     let suggestion = format!("{}-{}", s.trim_end_matches('-'), keys::MINUS);
@@ -657,7 +728,11 @@ impl std::str::FromStr for KeyEvent {
             _ => (),
         }
 
-        Ok(KeyEvent { code, modifiers })
+        Ok(KeyEvent {
+            code,
+            modifiers,
+            prefix: None,
+        })
     }
 }
 
@@ -675,11 +750,13 @@ impl From<crossterm::event::KeyEvent> for KeyEvent {
             Self {
                 code: KeyCode::Tab,
                 modifiers,
+                prefix: None,
             }
         } else {
             Self {
                 code: code.into(),
                 modifiers: modifiers.into(),
+                prefix: None,
             }
         }
     }
@@ -687,7 +764,9 @@ impl From<crossterm::event::KeyEvent> for KeyEvent {
 
 #[cfg(feature = "term")]
 impl From<KeyEvent> for crossterm::event::KeyEvent {
-    fn from(KeyEvent { code, modifiers }: KeyEvent) -> Self {
+    fn from(KeyEvent {
+        code, modifiers, ..
+    }: KeyEvent) -> Self {
         if code == KeyCode::Tab && modifiers.contains(KeyModifiers::SHIFT) {
             // special case for Shift-Tab -> BackTab
             let mut modifiers = modifiers;
