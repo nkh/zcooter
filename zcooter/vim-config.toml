@@ -1,64 +1,105 @@
-# Zcooter vim-style key bindings
-# Copy this file to ~/.config/scooter/config.toml to use it
+# Zcooter — vim-style key bindings
+# ================================
+#
+# Scooter has two modes when viewing results:
+#
+#   INSERT MODE (fields focused)
+#     Type normally in search / replace / include / exclude fields.
+#     Tab moves between fields.  Enter triggers a search.
+#
+#   NORMAL MODE (results focused)
+#     Navigate results, toggle selections, open files in editor.
+#     Press "i" to switch back to insert mode (fields).
+#     Press backspace to switch to insert mode AND delete the last
+#     character in the search field (convenient for quick edits).
+#
+# Prefix-key sequences
+# --------------------
+# Two types of two-key sequences are supported:
+#
+#   ":x"  — colon-prefixed.  Press : then a letter.  Used for
+#           commands modelled after vim's :command system.
+#
+#   "xy"  — leader-key.  Two letters typed in quick succession.
+#           The first letter is the "leader".  Used here with
+#           "z" as the leader for toggle commands.
+#
+# Usage
+# -----
+#   scooter --config zcooter/vim-config.toml
+#
+# Or copy this file to ~/.config/scooter/config.toml to use it
+# by default.
 
 [keys.general]
-# Quit with :q (prefix-key sequence) or C-c
+# Quit — :q (colon then q) or C-c
 quit = [":q", "C-c"]
-# Reset with :r
+# Reset all fields and return to the search screen
 reset = ":r"
-# Help with :h or ?
+# Show the help menu with all key bindings
 show_help_menu = [":h", "?"]
 
 [keys.search]
-toggle_preview_wrapping = "zl"
-toggle_hidden_files = "zh"
-toggle_multiline = "zm"
-toggle_interpret_escape_sequences = "ze"
-resize_column_shrink = ["C-left", "<"]
-resize_column_grow = ["C-right", ">"]
+# z-leader toggles (press z then the second key)
+# These work in BOTH insert and normal mode
+toggle_preview_wrapping = "zl"       # z+l: toggle line wrapping in the preview pane
+toggle_hidden_files = "zh"           # z+h: toggle showing hidden files (dotfiles)
+toggle_multiline = "zm"              # z+m: toggle multiline regex search
+toggle_interpret_escape_sequences = "ze"  # z+e: toggle \n \t \\ interpretation in replacement
+
+# Column resizing (works in both modes)
+resize_column_shrink = ["C-left", "<"]   # shrink the file-name column
+resize_column_grow = ["C-right", ">"]    # grow the file-name column
 
 [keys.search.fields]
-trigger_search = "enter"
-focus_next_field = "tab"
-focus_previous_field = "S-tab"
-unlock_prepopulated_fields = "A-u"
-open_file_finder = "A-f"
-# Vim-style field focusing
-focus_search_field = "/"
-focus_replace_field = "%"
-focus_include_field = "A-i"
-focus_exclude_field = "A-e"
-focus_fixed_field = "zf"
+# INSERT MODE — when the search / replace / include / exclude fields are focused
+trigger_search = "enter"          # run the search
+focus_next_field = "tab"          # cycle to the next field
+focus_previous_field = "S-tab"    # cycle to the previous field
+unlock_prepopulated_fields = "A-u"  # allow editing fields set via CLI args
+open_file_finder = "A-f"         # open file-finder popup (in include/exclude)
+
+# Vim-style direct field focus (insert mode)
+focus_search_field = "/"          # jump to the search field
+focus_replace_field = "%"         # jump to the replace field
+focus_include_field = "A-i"       # jump to the include field
+focus_exclude_field = "A-e"       # jump to the exclude field
+focus_fixed_field = "zf"          # z+f: jump to the fixed-strings toggle
+
+# Switch from insert mode to normal mode (results list)
 fields_to_results = ["down", "up"]
 
 [keys.search.results]
-# Navigation (vim-like with arrow fallbacks)
-move_down = ["j", "C-n", "down"]
-move_up = ["k", "C-p", "up"]
-move_next_file = ["C-down", "J"]
-move_prev_file = ["C-up", "K"]
-move_down_half_page = "C-d"
-move_up_half_page = "C-u"
-move_down_full_page = ["C-f", "pagedown"]
-move_up_full_page = ["C-b", "pageup"]
-move_top = ["g", "home"]
-move_bottom = ["G", "end"]
+# NORMAL MODE — when the search results list is focused
+
+# Navigation
+move_down = ["j", "C-n", "down"]          # next result (wraps)
+move_up = ["k", "C-p", "up"]              # previous result (wraps)
+move_next_file = ["C-down", "J"]          # jump to first match in next file
+move_prev_file = ["C-up", "K"]            # jump to first match in previous file
+move_down_half_page = "C-d"               # scroll down half a page
+move_up_half_page = "C-u"                 # scroll up half a page
+move_down_full_page = ["C-f", "pagedown"] # scroll down a full page
+move_up_full_page = ["C-b", "pageup"]     # scroll up a full page
+move_top = ["g", "home"]                  # jump to the first result
+move_bottom = ["G", "end"]                # jump to the last result
 
 # Mode switching
-back_to_fields = "C-o"
-enter_insert_mode = "i"
-backspace_to_search = "backspace"
+back_to_fields = "C-o"        # go back to insert mode (fields)
+enter_insert_mode = "i"       # go back to insert mode (fields) — vim-style
+backspace_to_search = "backspace"  # go to insert mode AND delete last char in search field
 
 # Actions
-trigger_replacement = "enter"
-open_in_editor = [":e", "e"]
-toggle_selected_inclusion = " "
-toggle_all_selected = "a"
-toggle_current_file_selected = "*"
-toggle_multiselect_mode = "v"
-flip_multiselect_direction = "o"
+trigger_replacement = "enter"          # confirm and run the replacement
+open_in_editor = [":e", "e"]           # open the current file in $EDITOR
+toggle_selected_inclusion = " "         # toggle whether the highlighted result is included
+toggle_all_selected = "a"               # select / deselect ALL results
+toggle_current_file_selected = "*"      # select / deselect all results in the current file
+toggle_multiselect_mode = "v"           # toggle visual/multiselect mode
+flip_multiselect_direction = "o"        # flip multiselect direction (up vs down)
 
 [keys.results]
+# REPLACEMENT RESULTS SCREEN — shown after running a replacement
 scroll_errors_down = ["j", "down", "C-n"]
 scroll_errors_up = ["k", "up", "C-p"]
 quit = ["enter", "q"]

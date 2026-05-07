@@ -477,30 +477,56 @@ impl std::fmt::Display for KeyEvent {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut result = String::new();
 
-        // Prefix key sequences are displayed as ":x"
+        // Prefix key sequences
         if let Some(prefix) = self.prefix {
-            result.push(':');
             match prefix {
-                KeyCode::Char(c) => result.push(c),
+                KeyCode::Char(':') => {
+                    // Colon-prefixed sequences: ":q"
+                    result.push(':');
+                    match self.code {
+                        KeyCode::Char(c) => result.push(c),
+                        KeyCode::F(n) => {
+                            use std::fmt::Write;
+                            write!(&mut result, "F{n}").unwrap();
+                        }
+                        _ => {
+                            let code_event = KeyEvent {
+                                code: self.code,
+                                modifiers: KeyModifiers::NONE,
+                                prefix: None,
+                            };
+                            result.push_str(&code_event.to_string());
+                        }
+                    }
+                }
+                KeyCode::Char(c) => {
+                    // Leader-key sequences: "zf" (just the two chars concatenated)
+                    result.push(c);
+                    match self.code {
+                        KeyCode::Char(second) => result.push(second),
+                        KeyCode::F(n) => {
+                            use std::fmt::Write;
+                            write!(&mut result, "F{n}").unwrap();
+                        }
+                        _ => {
+                            let code_event = KeyEvent {
+                                code: self.code,
+                                modifiers: KeyModifiers::NONE,
+                                prefix: None,
+                            };
+                            result.push_str(&code_event.to_string());
+                        }
+                    }
+                }
                 _ => {
-                    // For non-char prefixes, use the Display of the code alone
+                    // Non-char prefixes (unlikely but handled)
                     let prefix_event = KeyEvent {
                         code: prefix,
                         modifiers: KeyModifiers::NONE,
                         prefix: None,
                     };
                     result.push_str(&prefix_event.to_string());
-                }
-            }
-            result.push_str("-");
-            // Don't add modifiers for prefix sequences
-            match self.code {
-                KeyCode::Char(c) => result.push(c),
-                KeyCode::F(n) => {
-                    use std::fmt::Write;
-                    write!(&mut result, "F{n}").unwrap();
-                }
-                _ => {
+                    result.push('-');
                     let code_event = KeyEvent {
                         code: self.code,
                         modifiers: KeyModifiers::NONE,
@@ -598,7 +624,7 @@ impl std::str::FromStr for KeyEvent {
 
     #[allow(clippy::too_many_lines)]
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        // Handle prefix-key sequences: ":x" where x is a single character
+        // Handle colon-prefixed sequences: ":x" where x is a single character
         if let Some(rest) = s.strip_prefix(':') {
             let chars: Vec<char> = rest.chars().collect();
             if chars.len() == 1 {
@@ -615,6 +641,29 @@ impl std::str::FromStr for KeyEvent {
                 });
             }
             // If more than one char after ':', fall through to normal parsing
+        }
+
+        // Handle two-character prefix-key sequences (e.g. "zf", "zl") where the
+        // first character acts as a leader/prefix key.  This must come before
+        // the normal key-code matching because two-letter strings are never
+        // valid single key names (single-char keys are matched by the
+        // `single if single.chars().count() == 1` branch further down).
+        let chars: Vec<char> = s.chars().collect();
+        if chars.len() == 2
+            && chars[0].is_ascii_alphabetic()
+            && chars[1].is_ascii_alphabetic()
+            && !s.contains('-')
+        {
+            // Exclude known two-letter special key names (up, lt, gt) so they
+            // still parse correctly in the normal path below.
+            let known_two_char_keys = [keys::UP, keys::LESS_THAN, keys::GREATER_THAN];
+            if !known_two_char_keys.contains(&s) {
+                return Ok(KeyEvent {
+                    code: KeyCode::Char(chars[1]),
+                    modifiers: KeyModifiers::NONE,
+                    prefix: Some(KeyCode::Char(chars[0])),
+                });
+            }
         }
 
         let mut tokens: Vec<_> = s.split('-').collect();
