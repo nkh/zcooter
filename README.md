@@ -1,3 +1,48 @@
+# zcooter is a lightweight, interactive find-and-replace terminal UI app. 
+
+It **is** scooter (https://github.com/thomasschafer/scooter) and all the credit for the core find-and-replace functionality goes to that project.
+
+zcooter is a fork of scooter with a different UI and some additional features I added with the AI assitance ( I do read rust code, but I am not a rust developer, so the AI help was very much needed to navigate the codebase and add features without breaking much).
+
+Differences:
+- it has a different interface, which is more minimal
+- it has a single screen to facilitate a more streamlined workflow, rather than separate search and results screens
+- it adds more command line options
+- it provides vim bindings examples which is what I wanted to use scooter for but found the interface didn't match my workflow
+
+
+The Zcooter/ directory contains the documentation for zcooter, especially zcooter/changelog.md.
+
+Scooter's documentation is included below for reference, you should read it, note that zcooter keymaps will be different.
+
+You can build it with `cargo build --release`. The resulting **scooter** binary will be located at `target/release/scooter`. 
+
+The binary is still called *scooter* because it **is** scooter just a different UI/UX, but you can rename it to *zcooter* if you like.
+
+## Minimalistic interface
+
+![zcooter preview1](zcooter/media/screenshot_1.png)
+
+## Vim integration
+
+See the zcooter/vim-bindings.md file for details on how to integrate zcooter with Vim or Neovim; make sure you read the instructions on auto-reloading files, as that is important to ensure you don't lose work when switching back to Vim after running scooter.
+
+![zcooter preview2](zcooter/media/screenshot_2.png)
+
+### example of zcooter opened from vim to replace text in the current buffer
+
+- press <leader>SF, that will modify the current file only
+- type the text you want to find in the "Search text" field, and the replacement text in the "Replace text" field
+- press arrow down to move to the results, and press space to select which instances you want to replace (or toggle all with ctrl+w)
+- press enter to perform the replacement
+- you can perform multiple replacements without restarting scooter
+- press control-c to exit scooter and return to vim
+- vim will detect the changes and warn you
+
+## Scooter documentation
+
+Below is the README of scooter, you may like that interface more.
+
 # scooter
 
 scooter is an interactive find-and-replace terminal UI app. By default it recursively searches through files in the current directory, but can also be used to process text from stdin.

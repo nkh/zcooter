@@ -43,6 +43,13 @@ redraw the screen.
 :RunSilent <command>
 ```
 
+## Auto-reload files
+
+Add the following to your Vim config to auto-reload files changed on disk (e.g. after running scooter):
+
+set autoread
+autocmd FocusGained,BufEnter * checktime
+
 ## Bindings
 
 Add the following to your `.vimrc` (or `init.vim` for Neovim):
@@ -92,7 +99,7 @@ let g:scooter_cmd = 'VScooter'
 
 ```vim
 " Open scooter for the current file
-nnoremap <leader>SF :execute g:scooter_cmd expand('%')<CR>
+nnoremap <leader>SF :execute g:scooter_cmd . ' ' . fnameescape(expand('%'))<CR>
 
 " Open scooter for all files in the current git repo
 nnoremap <leader>SG :execute g:scooter_cmd trim(system('git rev-parse --show-toplevel'))<CR>
