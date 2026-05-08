@@ -2386,7 +2386,37 @@ impl<'a> App {
                 if state.focussed_section == FocussedSection::SearchFields {
                     // Fall through to return Left(Command) below
                 } else {
-                    // In results focus: forward unbound char keys to the search field
+                    // In results focus: check if this is a prefix key first
+                    if key_event.prefix.is_none()
+                        && !key_event.modifiers.contains(KeyModifiers::CONTROL)
+                        && !key_event.modifiers.contains(KeyModifiers::ALT)
+                        && self.key_map.has_prefix_for(key_event)
+                    {
+                        self.ui_state.pending_prefix = Some(key_event);
+                        return Right(EventHandlingResult::None);
+                    }
+
+                    // Check if this key is a field-specific command (e.g. "/" for
+                    // focus_search_field, "%" for focus_replace_field).  Execute it
+                    // without inserting the character into the search field.
+                    if key_event.prefix.is_none()
+                        && !key_event.modifiers.contains(KeyModifiers::CONTROL)
+                        && !key_event.modifiers.contains(KeyModifiers::ALT)
+                    {
+                        if let Some(field_cmd) = self.key_map.lookup_search_fields(key_event) {
+                            // Switch to fields focus first so the command handler accepts it
+                            let sfs = self
+                                .ui_state
+                                .current_screen
+                                .unwrap_search_fields_state_mut();
+                            sfs.focussed_section = FocussedSection::SearchFields;
+                            return Left(Command::SearchFields(
+                                CommandSearchFields::SearchFocusFields(field_cmd),
+                            ));
+                        }
+                    }
+
+                    // Forward unbound char keys to the search field
                     if let KeyCode::Char(_) = key_event.code {
                         if !key_event.modifiers.contains(KeyModifiers::CONTROL)
                             && !key_event.modifiers.contains(KeyModifiers::ALT)
@@ -2423,7 +2453,7 @@ impl<'a> App {
             if key_event.prefix.is_none()
                 && !key_event.modifiers.contains(KeyModifiers::CONTROL)
                 && !key_event.modifiers.contains(KeyModifiers::ALT)
-                && matches!(key_event.code, KeyCode::Char(':'))
+                && self.key_map.has_prefix_for(key_event)
             {
                 self.ui_state.pending_prefix = Some(key_event);
                 return Right(EventHandlingResult::None);

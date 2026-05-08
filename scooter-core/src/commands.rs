@@ -438,9 +438,15 @@ impl KeyMap {
     }
 
     /// Check if any command starts with the given prefix key
-    #[allow(dead_code)]
     pub(crate) fn has_prefix_for(&self, prefix: KeyEvent) -> bool {
         self.prefix_map.keys().any(|(p, _)| *p == prefix)
+    }
+
+    /// Look up a command in the search-fields keymap only (used as fallback
+    /// when in results focus to execute field-specific commands like
+    /// `focus_search_field` without inserting the key as text).
+    pub(crate) fn lookup_search_fields(&self, key_event: KeyEvent) -> Option<CommandSearchFocusFields> {
+        self.search_fields.get(&key_event).copied()
     }
 
     /// Look up a command for the given key event and screen context
