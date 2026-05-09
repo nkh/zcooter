@@ -769,6 +769,10 @@ pub struct UIState {
     errors: Vec<AppError>,
     hints: HintState,
     pub pending_prefix: Option<KeyEvent>,
+    /// When true, the next key press in fields focus is treated as a command
+    /// lookup rather than text input.  Set by pressing Esc, cleared when a
+    /// command is executed or when Esc is pressed again (cancel).
+    pending_escape: bool,
 }
 
 impl UIState {
@@ -781,6 +785,7 @@ impl UIState {
             errors: Vec::new(),
             hints: HintState::default(),
             pending_prefix: None,
+            pending_escape: false,
         }
     }
 
@@ -2358,12 +2363,64 @@ impl<'a> App {
             return Right(self.handle_file_finder_key(key_event));
         }
 
-        // Handle pending prefix key
+        // Handle pending prefix key (for two-key sequences like :q and zl)
         if let Some(prefix_key) = self.ui_state.pending_prefix.take() {
             if let Some(command) = self.key_map.lookup_prefix(prefix_key, key_event) {
                 return Left(command);
             }
             // No match for prefix combo — fall through to normal processing
+        }
+
+        // Handle pending escape in fields focus.
+        // When active, the next key press is treated as a command lookup
+        // rather than text input.  This lets users type literal ':', '/', '%',
+        // etc. in search fields — only Esc+:q triggers quit, not bare :q.
+        if self.ui_state.pending_escape {
+            if let Screen::SearchFields(state) = &self.ui_state.current_screen {
+                if state.focussed_section == FocussedSection::SearchFields {
+                    self.ui_state.pending_escape = false;
+
+                    // Esc pressed again → cancel
+                    if matches!(key_event.code, KeyCode::Esc) {
+                        return Right(EventHandlingResult::None);
+                    }
+
+                    // Try command lookup (handles tab, enter, control combos, etc.)
+                    let maybe_cmd = self
+                        .key_map
+                        .lookup(&self.ui_state.current_screen, key_event);
+                    if let Some(cmd) = maybe_cmd {
+                        return Left(cmd);
+                    }
+
+                    // No direct match — check if this is a prefix key
+                    // (e.g. ':' for ':q', 'z' for 'zl')
+                    if key_event.prefix.is_none()
+                        && !key_event.modifiers.contains(KeyModifiers::CONTROL)
+                        && !key_event.modifiers.contains(KeyModifiers::ALT)
+                        && self.key_map.has_prefix_for(key_event)
+                    {
+                        self.ui_state.pending_prefix = Some(key_event);
+                        return Right(EventHandlingResult::None);
+                    }
+
+                    // No match at all — discard the key (don't enter as text)
+                    return Right(EventHandlingResult::None);
+                }
+            }
+            // Not in fields focus — clear and fall through
+            self.ui_state.pending_escape = false;
+        }
+
+        // In fields focus, Esc activates command mode (pending_escape).
+        // Bare character keys always enter as text — no command interception.
+        if matches!(key_event.code, KeyCode::Esc) && key_event.prefix.is_none() {
+            if let Screen::SearchFields(state) = &self.ui_state.current_screen {
+                if state.focussed_section == FocussedSection::SearchFields {
+                    self.ui_state.pending_escape = true;
+                    return Right(EventHandlingResult::None);
+                }
+            }
         }
 
         let maybe_event = self
@@ -2381,10 +2438,14 @@ impl<'a> App {
         let event = if let Some(event) = maybe_event {
             event
         } else {
-            // If we're in SearchFields focus, treat unmatched keys as text input
             if let Screen::SearchFields(state) = &self.ui_state.current_screen {
                 if state.focussed_section == FocussedSection::SearchFields {
-                    // Fall through to return Left(Command) below
+                    // Fields focus: enter unmatched keys as text.
+                    // No prefix check here — bare chars always type text.
+                    // Prefix-key sequences require Esc first (see above).
+                    return Left(Command::SearchFields(CommandSearchFields::SearchFocusFields(
+                        CommandSearchFocusFields::EnterChars(key_event.code, key_event.modifiers),
+                    )));
                 } else {
                     // In results focus: check if this is a prefix key first
                     if key_event.prefix.is_none()
@@ -2397,14 +2458,12 @@ impl<'a> App {
                     }
 
                     // Check if this key is a field-specific command (e.g. "/" for
-                    // focus_search_field, "%" for focus_replace_field).  Execute it
-                    // without inserting the character into the search field.
+                    // focus_search_field).  Execute it without inserting the char.
                     if key_event.prefix.is_none()
                         && !key_event.modifiers.contains(KeyModifiers::CONTROL)
                         && !key_event.modifiers.contains(KeyModifiers::ALT)
                     {
                         if let Some(field_cmd) = self.key_map.lookup_search_fields(key_event) {
-                            // Switch to fields focus first so the command handler accepts it
                             let sfs = self
                                 .ui_state
                                 .current_screen
@@ -2421,7 +2480,6 @@ impl<'a> App {
                         if !key_event.modifiers.contains(KeyModifiers::CONTROL)
                             && !key_event.modifiers.contains(KeyModifiers::ALT)
                         {
-                            // Switch to fields focus and enter the char
                             let sfs = self
                                 .ui_state
                                 .current_screen
@@ -2438,27 +2496,7 @@ impl<'a> App {
             } else {
                 return Right(EventHandlingResult::None);
             }
-
-            // Reachable only when in SearchFields focus with no file finder
-            Command::SearchFields(CommandSearchFields::SearchFocusFields(
-                CommandSearchFocusFields::EnterChars(key_event.code, key_event.modifiers),
-            ))
         };
-
-        // If no command was found, check if this key is a prefix for any binding
-        if matches!(event, Command::SearchFields(CommandSearchFields::SearchFocusFields(
-            CommandSearchFocusFields::EnterChars(_, _)
-        ))) {
-            // Only check prefix for raw char keys with no modifiers
-            if key_event.prefix.is_none()
-                && !key_event.modifiers.contains(KeyModifiers::CONTROL)
-                && !key_event.modifiers.contains(KeyModifiers::ALT)
-                && self.key_map.has_prefix_for(key_event)
-            {
-                self.ui_state.pending_prefix = Some(key_event);
-                return Right(EventHandlingResult::None);
-            }
-        }
 
         Left(event)
     }
@@ -2822,8 +2860,10 @@ impl<'a> App {
         macro_rules! keymap {
             ($($path:tt).+, $name:expr, $show:expr $(,)?) => {
                 (
-                    format!("<{}>", self.config.keys.$($path).+.first()
-                        .map_or_else(|| "n/a".to_string(), std::string::ToString::to_string)),
+                    format!("<{}>", self.config.keys.$($path).+.iter()
+                        .map(|k| k.to_string())
+                        .collect::<Vec<_>>()
+                        .join(", ")),
                     $name,
                     $show,
                 )
@@ -2981,14 +3021,11 @@ impl<'a> App {
             false
         };
 
-        let esc_help = format!(
-            "close popup{}",
-            if on_search_results {
-                " / exit multi-select"
-            } else {
-                ""
-            }
-        );
+        let esc_help = if on_search_results {
+            "close popup / exit multi-select".to_string()
+        } else {
+            "command mode (type a command key)".to_string()
+        };
 
         let additional_keys = vec![
             keymap!(
