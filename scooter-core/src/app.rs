@@ -3084,21 +3084,21 @@ impl<'a> App {
             keymap!(general.quit, "quit", Show::Both),
         ];
 
-        // Hard-coded shortcuts handled by interception (not in keymap)
+        // Shortcuts handled by field-level interception in fields focus
+        // and by lookup_search_fields() fallback in results focus.
+        // Also available via Esc-prefix in results focus.
         let intercepted_keys: Vec<(String, &str, Show)> = {
             let mut k = vec![];
             // Field focus shortcuts
-            k.push(("<C-s>".to_string(), "focus search", Show::FullOnly));
-            k.push(("<C-r>".to_string(), "focus replace", Show::FullOnly));
-            k.push(("<C-i>".to_string(), "focus include", Show::FullOnly));
-            k.push(("<C-e>".to_string(), "focus exclude", Show::FullOnly));
-            k.push(("<C-t>".to_string(), "focus fixed toggle", Show::FullOnly));
-            // Toggle all (hard-coded)
-            k.push(("<C-w>".to_string(), "toggle all", Show::FullOnly));
-            // Column resize (hard-coded)
+            k.push(keymap!(search.fields.focus_search_field, "focus search", Show::FullOnly));
+            k.push(keymap!(search.fields.focus_replace_field, "focus replace", Show::FullOnly));
+            k.push(keymap!(search.fields.focus_include_field, "focus include", Show::FullOnly));
+            k.push(keymap!(search.fields.focus_exclude_field, "focus exclude", Show::FullOnly));
+            k.push(keymap!(search.fields.focus_fixed_field, "focus fixed toggle", Show::FullOnly));
+            // Column resize (intercepted at input level)
             if on_search_results {
-                k.push(("<C-left>".to_string(), "narrow file column", Show::FullOnly));
-                k.push(("<C-right>".to_string(), "widen file column", Show::FullOnly));
+                k.push(keymap!(search.resize_column_shrink, "narrow file column", Show::FullOnly));
+                k.push(keymap!(search.resize_column_grow, "widen file column", Show::FullOnly));
             }
             k
         };
