@@ -151,6 +151,12 @@ pub struct KeysSearch {
     pub toggle_multiline: Keys,
     /// Toggle interpretation of escape sequences in replacement text (\n becomes newline, \t becomes tab, \\ becomes backslash)
     pub toggle_interpret_escape_sequences: Keys,
+    /// Toggle fixed-strings mode (treat search pattern as a literal string instead of a regex)
+    pub toggle_fixed_strings: Keys,
+    /// Toggle whole-word matching
+    pub toggle_match_whole_word: Keys,
+    /// Toggle case-sensitive matching
+    pub toggle_match_case: Keys,
     /// Shrink the file name column width
     pub resize_column_shrink: Keys,
     /// Grow the file name column width
@@ -176,6 +182,9 @@ impl Default for KeysSearch {
                 KeyCode::Char('e'),
                 KeyModifiers::ALT
             )],
+            toggle_fixed_strings: keys![KeyEvent::new(KeyCode::Char('f'), KeyModifiers::ALT)],
+            toggle_match_whole_word: keys![KeyEvent::new(KeyCode::Char('w'), KeyModifiers::ALT)],
+            toggle_match_case: keys![KeyEvent::new(KeyCode::Char('c'), KeyModifiers::ALT)],
             resize_column_shrink: keys![KeyEvent::new(KeyCode::Left, KeyModifiers::CONTROL)],
             resize_column_grow: keys![KeyEvent::new(KeyCode::Right, KeyModifiers::CONTROL)],
             fields: KeysSearchFocusFields::default(),

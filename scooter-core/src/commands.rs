@@ -65,6 +65,9 @@ pub(crate) enum CommandSearchFields {
     ToggleHiddenFiles,
     ToggleMultiline,
     ToggleInterpretEscapeSequences,
+    ToggleFixedStrings,
+    ToggleMatchWholeWord,
+    ToggleMatchCase,
     ResizeColumnShrink,
     ResizeColumnGrow,
     SearchFocusFields(CommandSearchFocusFields),
@@ -204,6 +207,12 @@ impl KeyMap {
                     toggle_interpret_escape_sequences,
                     CommandSearchFields::ToggleInterpretEscapeSequences
                 ),
+                (toggle_fixed_strings, CommandSearchFields::ToggleFixedStrings),
+                (
+                    toggle_match_whole_word,
+                    CommandSearchFields::ToggleMatchWholeWord
+                ),
+                (toggle_match_case, CommandSearchFields::ToggleMatchCase),
                 (resize_column_shrink, CommandSearchFields::ResizeColumnShrink),
                 (resize_column_grow, CommandSearchFields::ResizeColumnGrow),
             ]

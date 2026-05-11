@@ -71,6 +71,9 @@ Scooter supports two styles of two-key (chord) sequences:
     | `zh`    | Toggle hidden files (dotfiles)           |
     | `zm`    | Toggle multiline regex search            |
     | `ze`    | Toggle escape-sequence interpretation    |
+    | `zc`    | Toggle fixed-strings mode (literal search) |
+    | `zw`    | Toggle whole-word matching                |
+    | `zs`    | Toggle case-sensitive matching            |
     | `zf`    | Focus the fixed-strings toggle field     |
 
 ### Default vs vim key bindings
@@ -95,6 +98,9 @@ An entry in parentheses means the binding exists only in that config.
 | toggle hidden files              | `C-t`            | `zh`                 |
 | toggle multiline                 | `A-m`            | `zm`                 |
 | toggle escape sequences          | `A-e`            | `ze`                 |
+| toggle fixed strings             | `A-f`            | `zc`                 |
+| toggle whole word                | `A-w`            | `zw`                 |
+| toggle case sensitive            | `A-c`            | `zs`                 |
 | shrink column                    | `C-left`         | `C-left`, `<`        |
 | grow column                      | `C-right`        | `C-right`, `>`       |
 

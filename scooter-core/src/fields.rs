@@ -422,6 +422,24 @@ impl SearchFields {
 
     define_field_accessor_mut!(search_mut, FieldName::Search, Text, &mut TextField);
     define_field_accessor_mut!(
+        fixed_strings_mut,
+        FieldName::FixedStrings,
+        Checkbox,
+        &mut CheckboxField
+    );
+    define_field_accessor_mut!(
+        whole_word_mut,
+        FieldName::WholeWord,
+        Checkbox,
+        &mut CheckboxField
+    );
+    define_field_accessor_mut!(
+        match_case_mut,
+        FieldName::MatchCase,
+        Checkbox,
+        &mut CheckboxField
+    );
+    define_field_accessor_mut!(
         include_files_mut,
         FieldName::IncludeFiles,
         Text,

@@ -2296,6 +2296,33 @@ impl<'a> App {
                         );
                         self.handle_replacement_config_change()
                     }
+                    CommandSearchFields::ToggleFixedStrings => {
+                        let checked = {
+                            let cb = self.search_fields.fixed_strings_mut();
+                            cb.checked = !cb.checked;
+                            cb.checked
+                        };
+                        self.show_toggle_toast("Fixed strings", checked);
+                        self.handle_replacement_config_change()
+                    }
+                    CommandSearchFields::ToggleMatchWholeWord => {
+                        let checked = {
+                            let cb = self.search_fields.whole_word_mut();
+                            cb.checked = !cb.checked;
+                            cb.checked
+                        };
+                        self.show_toggle_toast("Whole word", checked);
+                        self.handle_replacement_config_change()
+                    }
+                    CommandSearchFields::ToggleMatchCase => {
+                        let checked = {
+                            let cb = self.search_fields.match_case_mut();
+                            cb.checked = !cb.checked;
+                            cb.checked
+                        };
+                        self.show_toggle_toast("Case sensitive", checked);
+                        self.handle_replacement_config_change()
+                    }
                     CommandSearchFields::ResizeColumnShrink => {
                         let sfs = self
                             .ui_state
@@ -2997,6 +3024,21 @@ impl<'a> App {
                 keys.push(keymap!(
                     search.toggle_interpret_escape_sequences,
                     "toggle escape sequences",
+                    Show::FullOnly,
+                ));
+                keys.push(keymap!(
+                    search.toggle_fixed_strings,
+                    "toggle fixed strings",
+                    Show::FullOnly,
+                ));
+                keys.push(keymap!(
+                    search.toggle_match_whole_word,
+                    "toggle whole word",
+                    Show::FullOnly,
+                ));
+                keys.push(keymap!(
+                    search.toggle_match_case,
+                    "toggle case sensitive",
                     Show::FullOnly,
                 ));
                 keys

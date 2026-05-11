@@ -47,6 +47,11 @@ toggle_hidden_files = "zh"           # z+h: toggle showing hidden files (dotfile
 toggle_multiline = "zm"              # z+m: toggle multiline regex search
 toggle_interpret_escape_sequences = "ze"  # z+e: toggle \n \t \\ interpretation in replacement
 
+# Search option toggles (work in both modes)
+toggle_fixed_strings = "zc"          # z+c: toggle fixed-strings mode (literal search)
+toggle_match_whole_word = "zw"       # z+w: toggle whole-word matching
+toggle_match_case = "zs"             # z+s: toggle case-sensitive matching
+
 # Column resizing (works in both modes)
 resize_column_shrink = ["C-left", "<"]   # shrink the file-name column
 resize_column_grow = ["C-right", ">"]    # grow the file-name column
