@@ -2398,55 +2398,56 @@ impl<'a> App {
             // No match for prefix combo — fall through to normal processing
         }
 
-        // Handle pending escape in fields focus.
+        // Handle pending escape (command mode).
         // When active, the next key press is treated as a command lookup
         // rather than text input.  This lets users type literal ':', '/', '%',
         // etc. in search fields — only Esc+:q triggers quit, not bare :q.
+        // Works in both fields focus and results focus.
         if self.ui_state.pending_escape {
-            if let Screen::SearchFields(state) = &self.ui_state.current_screen {
-                if state.focussed_section == FocussedSection::SearchFields {
-                    self.ui_state.pending_escape = false;
-
-                    // Esc pressed again → cancel
-                    if matches!(key_event.code, KeyCode::Esc) {
-                        return Right(EventHandlingResult::None);
-                    }
-
-                    // Try command lookup (handles tab, enter, control combos, etc.)
-                    let maybe_cmd = self
-                        .key_map
-                        .lookup(&self.ui_state.current_screen, key_event);
-                    if let Some(cmd) = maybe_cmd {
-                        return Left(cmd);
-                    }
-
-                    // No direct match — check if this is a prefix key
-                    // (e.g. ':' for ':q', 'z' for 'zl')
-                    if key_event.prefix.is_none()
-                        && !key_event.modifiers.contains(KeyModifiers::CONTROL)
-                        && !key_event.modifiers.contains(KeyModifiers::ALT)
-                        && self.key_map.has_prefix_for(key_event)
-                    {
-                        self.ui_state.pending_prefix = Some(key_event);
-                        return Right(EventHandlingResult::None);
-                    }
-
-                    // No match at all — discard the key (don't enter as text)
-                    return Right(EventHandlingResult::None);
-                }
-            }
-            // Not in fields focus — clear and fall through
             self.ui_state.pending_escape = false;
+
+            // Esc pressed again → cancel
+            if matches!(key_event.code, KeyCode::Esc) && key_event.prefix.is_none() {
+                return Right(EventHandlingResult::None);
+            }
+
+            // Try command lookup (handles tab, enter, control combos, etc.)
+            let maybe_cmd = self
+                .key_map
+                .lookup(&self.ui_state.current_screen, key_event);
+            if let Some(cmd) = maybe_cmd {
+                return Left(cmd);
+            }
+
+            // No direct match — check if this is a prefix key
+            // (e.g. ':' for ':q', 'z' for 'zl')
+            if key_event.prefix.is_none()
+                && !key_event.modifiers.contains(KeyModifiers::CONTROL)
+                && !key_event.modifiers.contains(KeyModifiers::ALT)
+                && self.key_map.has_prefix_for(key_event)
+            {
+                self.ui_state.pending_prefix = Some(key_event);
+                return Right(EventHandlingResult::None);
+            }
+
+            // No match at all — discard the key (don't enter as text)
+            return Right(EventHandlingResult::None);
         }
 
-        // In fields focus, Esc activates command mode (pending_escape).
-        // Bare character keys always enter as text — no command interception.
+        // Esc activates command mode (pending_escape) in SearchFields screen.
+        // In fields focus: bare character keys normally enter as text, so Esc
+        // is needed to type command keys like ':', '/', '%'.
+        // In results focus: prefix keys (':', 'z') already work directly,
+        // but Esc ensures they don't get forwarded to the search field.
+        // If a popup is open, Esc closes it instead of activating command mode.
         if matches!(key_event.code, KeyCode::Esc) && key_event.prefix.is_none() {
-            if let Screen::SearchFields(state) = &self.ui_state.current_screen {
-                if state.focussed_section == FocussedSection::SearchFields {
-                    self.ui_state.pending_escape = true;
-                    return Right(EventHandlingResult::None);
-                }
+            if self.ui_state.popup.is_some() {
+                self.clear_popup();
+                return Right(EventHandlingResult::Rerender);
+            }
+            if let Screen::SearchFields(_) = &self.ui_state.current_screen {
+                self.ui_state.pending_escape = true;
+                return Right(EventHandlingResult::None);
             }
         }
 
@@ -3063,11 +3064,7 @@ impl<'a> App {
             false
         };
 
-        let esc_help = if on_search_results {
-            "close popup / exit multi-select".to_string()
-        } else {
-            "command mode (type a command key)".to_string()
-        };
+        let esc_help = "command mode (type a command key)".to_string();
 
         let additional_keys = vec![
             keymap!(
