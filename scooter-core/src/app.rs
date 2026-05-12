@@ -2451,6 +2451,46 @@ impl<'a> App {
             }
         }
 
+        // Handle Alt-modified char keys that may be terminal escape sequence
+        // artifacts (Esc+':' arriving as M-:).  If an Alt+char has no direct
+        // binding, strip Alt and check if the base key is a prefix key or
+        // has a direct binding — use that instead.  This makes Esc+:q work
+        // reliably even in terminals with short escape timeouts (e.g. vim's
+        // :terminal, tmux, etc.) where Esc+key may be fused into M-key.
+        if key_event.prefix.is_none()
+            && key_event.modifiers.contains(KeyModifiers::ALT)
+            && !key_event.modifiers.contains(KeyModifiers::CONTROL)
+            && matches!(key_event.code, KeyCode::Char(_))
+        {
+            if let Some(event) = self.key_map.lookup(&self.ui_state.current_screen, key_event) {
+                return Left(event);
+            }
+            // No direct Alt binding — try as bare key (strip Alt)
+            let bare_key = KeyEvent::new(key_event.code, KeyModifiers::NONE);
+            if let Some(event) = self.key_map.lookup(&self.ui_state.current_screen, bare_key) {
+                return Left(event);
+            }
+            if self.key_map.has_prefix_for(bare_key) {
+                self.ui_state.pending_prefix = Some(bare_key);
+                return Right(EventHandlingResult::None);
+            }
+            // Also check field-specific commands (e.g. M-/ → focus search)
+            if let Some(field_cmd) = self.key_map.lookup_search_fields(bare_key) {
+                if let Screen::SearchFields(state) = &self.ui_state.current_screen {
+                    if state.focussed_section == FocussedSection::SearchResults {
+                        let sfs = self
+                            .ui_state
+                            .current_screen
+                            .unwrap_search_fields_state_mut();
+                        sfs.focussed_section = FocussedSection::SearchFields;
+                        return Left(Command::SearchFields(
+                            CommandSearchFields::SearchFocusFields(field_cmd),
+                        ));
+                    }
+                }
+            }
+        }
+
         let maybe_event = self
             .key_map
             .lookup(&self.ui_state.current_screen, key_event);
