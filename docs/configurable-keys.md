@@ -22,12 +22,27 @@ All key bindings in zcooter are now fully configurable via the `[keys]` section 
 
 ## Prefix-Key System
 
-Zcooter supports two-key sequences via a prefix key. The default prefix is `:` (colon). To use a prefix-key binding:
+Zcooter supports two types of two-key sequences:
 
-1. Press the prefix key (`:`) — the key is consumed (no visible feedback yet)
-2. Press the second key within the sequence (e.g., `q`)
+- **Colon-prefix** (`:x`) — Press `:` then a letter. Modelled after vim's `:command` system.
+- **Leader-key** (`xy`) — Two letters typed in quick succession. The first letter is the "leader". Used in the vim config with `z` as the leader for toggle commands.
 
-If no matching second key is pressed, the prefix is silently discarded.
+### Esc-prefix (command mode)
+
+When the search fields are focused (insert mode), bare letter keys are entered as text. To type command keys like `:q`, `/`, or `zl`, press **Esc** first to enter command mode:
+
+```
+Esc : q      quit
+Esc /        focus search field
+Esc z l      toggle line wrapping
+Esc Esc      cancel (no-op)
+```
+
+This also works in results focus (normal mode) to ensure prefix keys aren't forwarded to the search field.
+
+Control keys, Alt keys, Tab, and Enter always work as commands directly without needing Esc.
+
+If no matching second key is pressed after the prefix, the prefix is silently discarded.
 
 ### Built-in prefix bindings (vim config)
 
@@ -63,6 +78,9 @@ quit = ":q"
 | `C-t` | Toggle hidden files |
 | `A-m` | Toggle multiline |
 | `A-e` | Toggle escape sequences |
+| `A-f` | Toggle fixed strings |
+| `A-w` | Toggle whole word |
+| `A-c` | Toggle case sensitive |
 | `C-left` | Shrink file column |
 | `C-right` | Grow file column |
 
@@ -106,6 +124,7 @@ quit = ":q"
 | `enter` | Trigger replacement |
 | `C-o` | Back to fields |
 | `e` | Open in editor |
+| `Esc` | Command mode (type a command key) |
 
 ## Vim-Style Config
 
@@ -140,6 +159,6 @@ The following shortcuts are no longer hardcoded and must be configured:
 - **C-t** (focus fixed) — now `focus_fixed_field = "C-t"` in `[keys.search.fields]`
 - **C-left** / **C-right** (resize columns) — now in `[keys.search]`
 - **Up/Down** in fields focus (switch to results) — now `fields_to_results = ["down", "up"]` in `[keys.search.fields]`
-- **Esc** (exit multiselect) — removed; bind `toggle_multiselect_mode` to `esc` manually if desired
+- **Esc** — now activates command mode in fields and results focus; press Esc then a command key. Previously was used to exit multiselect (removed).
 
 If you had these in a custom config without the new fields, they will get the defaults automatically via `serde(default)`.

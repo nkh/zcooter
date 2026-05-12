@@ -28,6 +28,26 @@
 
 ---
 
+## Esc-prefix (Command Mode)
+
+| Key Sequence | Action                                           |
+|--------------|--------------------------------------------------|
+| `Esc Esc`    | Cancel (no-op)                                   |
+| `Esc : q`    | Quit scooter                                     |
+| `Esc : r`    | Reset all fields                                 |
+| `Esc : h`    | Show help menu                                   |
+| `Esc : e`    | Open in editor                                   |
+| `Esc /`      | Focus search field                               |
+| `Esc z l`    | Toggle line wrapping                             |
+
+> In **insert mode** (fields focused), bare letters are typed as text.
+> Press **Esc** first to type command keys (`:q`, `/`, `zl`, etc.).
+> In **normal mode** (results focused), prefix keys (`:`, `z`) work
+> directly, but Esc ensures they aren't forwarded to the search field.
+> Control keys, Alt keys, Tab, and Enter always work as commands directly.
+
+---
+
 ## General Commands (All Screens)
 
 | Key          | Action                                   |
@@ -101,6 +121,7 @@
 
 | Key         | Action                                        |
 |-------------|-----------------------------------------------|
+| `Esc`       | Command mode — type a command key (both modes) |
 | `i`         | Enter insert mode (fields) — vim-style        |
 | `backspace` | Enter insert mode AND delete last char in search |
 | `C-o`       | Go back to search fields (insert mode)        |

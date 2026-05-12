@@ -20,6 +20,19 @@
 
 ---
 
+## Esc-prefix (Command Mode)
+
+| Key Sequence | Action                                           |
+|--------------|--------------------------------------------------|
+| `Esc Esc`    | Cancel (no-op)                                   |
+| `Esc` + any command key | Execute command instead of typing text |
+
+> When the search fields are focused, bare letter keys are entered as text.
+> Press **Esc** first to type command keys like `:q`, `/`, or `C-s`.
+> Control keys, Alt keys, Tab, and Enter always work as commands directly.
+
+---
+
 ## General Commands (All Screens)
 
 | Key   | Action                                   |

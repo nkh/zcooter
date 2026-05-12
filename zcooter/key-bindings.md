@@ -27,6 +27,9 @@ All bindings below are configurable. The key format uses `C-` for Ctrl, `A-` or 
 | Toggle hidden files (dotfiles) | `C-t` | |
 | Toggle multiline search | `A-m` | Allows regex to span multiple lines |
 | Toggle escape sequences in replace | `A-e` | `\n` becomes newline, `\t` tab, `\\` backslash |
+| Toggle fixed strings | `A-f` | Literal search (no regex) |
+| Toggle whole word | `A-w` | Match whole words only |
+| Toggle case sensitive | `A-c` | Case-sensitive matching |
 | Shrink file column | `C-left` | Minimum 10% |
 | Grow file column | `C-right` | Maximum 80% |
 
@@ -77,6 +80,7 @@ All bindings below are configurable. The key format uses `C-` for Ctrl, `A-` or 
 | Backspace to search | `Backspace` | Focus search field, delete last char |
 | Visual select mode | `v` | Select a range of results |
 | Flip visual direction | `A-;` | Swap anchor in visual select |
+| Command mode | `Esc` | Next key is treated as command, not text |
 
 ### Results screen (post-replacement)
 
@@ -91,7 +95,8 @@ All bindings below are configurable. The key format uses `C-` for Ctrl, `A-` or 
 | Context | Behavior | Notes |
 |---------|----------|-------|
 | File finder open | `Esc` closes, `Enter` confirms, `j/k/Up/Down` navigate, `Backspace` deletes from query | Hardcoded — modal overlay |
-| Popup open | Any key (except Quit) closes it | Hardcoded |
+| Popup open | `Esc` closes it | |
+| `Esc` pressed (fields or results focus) | Activates command mode — next key is treated as command | Use `Esc : q` to quit from fields, `Esc Esc` to cancel |
 | Unbound printable char (results focus) | Switches to fields focus and types the char | Text input fallback |
 | Unbound printable char (fields focus) | Typed into the current field | Standard text entry |
 
@@ -105,7 +110,7 @@ Zcooter forked from [scooter](https://github.com/nicbarker/scooter) at commit `e
 
 | Binding | Original purpose | Reason for removal |
 |---------|-----------------|-------------------|
-| `Esc` → back to fields | Exit results, return to search | Caused ~100ms delay due to terminal escape sequence disambiguation. Replaced by `C-o`. |
+| `Esc` → back to fields | Exit results, return to search | Replaced by `C-o`. Esc now activates command mode instead. |
 | `Ctrl+T` → open file finder | Open file finder popup | Conflicted with `toggle_hidden_files`. File finder moved to `A-f`. |
 
 ### Changed default keys
@@ -114,7 +119,7 @@ Zcooter forked from [scooter](https://github.com/nicbarker/scooter) at commit `e
 |--------|-----------------|---------|--------|
 | Toggle all selected | `C-a` → `C-g` → `C-w` | `C-w` | Avoided tmux conflict (`C-a`) and git conflict (`C-g`) |
 | Open file finder | `C-t` | `A-f` | Avoided conflict with `toggle_hidden_files` |
-| Back to fields | `C-o`, `Esc` | `C-o` only | Esc delay removed |
+| Back to fields | `C-o`, `Esc` | `C-o` only | Esc now activates command mode |
 
 ### New commands (not in original scooter)
 
@@ -187,3 +192,16 @@ quit = [":q", "C-c", "q"]
 ```
 
 The prefix `:` is consumed on the first keypress. The second keypress triggers the command if the sequence is registered, or is processed normally if not.
+
+### Esc-prefix (command mode)
+
+When the search fields are focused (insert mode), bare letter keys are entered as text. To type command keys like `:q`, `/`, or `zl`, press **Esc** first to enter command mode. This also works in results focus (normal mode).
+
+```
+Esc : q      quit
+Esc /        focus search field
+Esc z l      toggle line wrapping
+Esc Esc      cancel (no-op)
+```
+
+Control keys, Alt keys, Tab, and Enter always work as commands directly without needing Esc.
