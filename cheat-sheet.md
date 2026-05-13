@@ -29,6 +29,8 @@
 
 > When the search fields are focused, bare letter keys are entered as text.
 > Press **Esc** first to type command keys like `:q`, `/`, or `C-s`.
+> In results focus, prefix keys (`:`, `z`) and field commands (`/`, `%`)
+> are handled directly without needing Esc.
 > Control keys, Alt keys, Tab, and Enter always work as commands directly.
 
 ---
@@ -51,7 +53,7 @@
 | `C-t`     | Toggle hidden files (dotfiles)                      |
 | `A-m`     | Toggle multiline regex search                       |
 | `A-e`     | Toggle escape-sequence interpretation in replace    |
-| `A-f`     | Toggle fixed-strings mode (literal search)          |
+| `A-x`     | Toggle fixed-strings mode (literal search)          |
 | `A-w`     | Toggle whole-word matching                          |
 | `A-c`     | Toggle case-sensitive matching                      |
 | `C-left`  | Shrink the file-name column width                   |

@@ -182,7 +182,7 @@ impl Default for KeysSearch {
                 KeyCode::Char('e'),
                 KeyModifiers::ALT
             )],
-            toggle_fixed_strings: keys![KeyEvent::new(KeyCode::Char('f'), KeyModifiers::ALT)],
+            toggle_fixed_strings: keys![KeyEvent::new(KeyCode::Char('x'), KeyModifiers::ALT)],
             toggle_match_whole_word: keys![KeyEvent::new(KeyCode::Char('w'), KeyModifiers::ALT)],
             toggle_match_case: keys![KeyEvent::new(KeyCode::Char('c'), KeyModifiers::ALT)],
             resize_column_shrink: keys![KeyEvent::new(KeyCode::Left, KeyModifiers::CONTROL)],

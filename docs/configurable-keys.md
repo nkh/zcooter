@@ -38,7 +38,7 @@ Esc z l      toggle line wrapping
 Esc Esc      cancel (no-op)
 ```
 
-This also works in results focus (normal mode) to ensure prefix keys aren't forwarded to the search field.
+In results focus (normal mode), prefix keys (`:`, `z`) and field commands (`/`, `%`) are handled directly without needing Esc — pressing Esc in results focus is a no-op.
 
 Control keys, Alt keys, Tab, and Enter always work as commands directly without needing Esc.
 
@@ -78,7 +78,7 @@ quit = ":q"
 | `C-t` | Toggle hidden files |
 | `A-m` | Toggle multiline |
 | `A-e` | Toggle escape sequences |
-| `A-f` | Toggle fixed strings |
+| `A-x` | Toggle fixed strings |
 | `A-w` | Toggle whole word |
 | `A-c` | Toggle case sensitive |
 | `C-left` | Shrink file column |
@@ -151,6 +151,7 @@ No action required. The default config preserves all existing bindings exactly a
 
 The following shortcuts are no longer hardcoded and must be configured:
 
+- **A-x** (toggle fixed strings) — now bound via `toggle_fixed_strings = "A-x"` in `[keys.search]` (default was previously `A-f`, which conflicted with `open_file_finder`)
 - **C-w** (toggle all files) — now bound via `toggle_all_selected = "C-w"` in `[keys.search.results]`
 - **C-s** (focus search) — now `focus_search_field = "C-s"` in `[keys.search.fields]`
 - **C-r** (focus replace) — now `focus_replace_field = "C-r"` in `[keys.search.fields]`
@@ -159,6 +160,6 @@ The following shortcuts are no longer hardcoded and must be configured:
 - **C-t** (focus fixed) — now `focus_fixed_field = "C-t"` in `[keys.search.fields]`
 - **C-left** / **C-right** (resize columns) — now in `[keys.search]`
 - **Up/Down** in fields focus (switch to results) — now `fields_to_results = ["down", "up"]` in `[keys.search.fields]`
-- **Esc** — now activates command mode in fields and results focus; press Esc then a command key. Previously was used to exit multiselect (removed).
+- **Esc** — now activates command mode in fields focus; press Esc then a command key. In results focus, prefix keys and field commands work directly. Previously was used to exit multiselect (removed).
 
 If you had these in a custom config without the new fields, they will get the defaults automatically via `serde(default)`.

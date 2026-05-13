@@ -92,6 +92,12 @@ toggle_hidden_files = "C-t"
 toggle_multiline = "A-m"
 # Toggle escape sequence interpretation in replacement text
 toggle_interpret_escape_sequences = "A-e"
+# Toggle fixed-strings mode (literal search, no regex)
+toggle_fixed_strings = "A-x"
+# Toggle whole-word matching
+toggle_match_whole_word = "A-w"
+# Toggle case-sensitive matching
+toggle_match_case = "A-c"
 # Shrink file name column width
 resize_column_shrink = "C-left"
 # Grow file name column width

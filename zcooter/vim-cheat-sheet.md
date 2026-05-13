@@ -42,8 +42,8 @@
 
 > In **insert mode** (fields focused), bare letters are typed as text.
 > Press **Esc** first to type command keys (`:q`, `/`, `zl`, etc.).
-> In **normal mode** (results focused), prefix keys (`:`, `z`) work
-> directly, but Esc ensures they aren't forwarded to the search field.
+> In **normal mode** (results focused), prefix keys (`:`, `z`) and field
+> commands (`/`, `%`) are handled directly without needing Esc.
 > Control keys, Alt keys, Tab, and Enter always work as commands directly.
 
 ---
