@@ -1,35 +1,52 @@
 # zcooter is a lightweight, interactive find-and-replace terminal UI app. 
 
-It **is** scooter (https://github.com/thomasschafer/scooter) and all the credit for the core find-and-replace functionality goes to that project.
+A terminal-native, interactive find-and-replace tool. Search through files with regex or fixed strings, preview every match with syntax highlighting, cherry-pick which occurrences to replace, and get back to coding.
+
+No web browser. No mouse required. Just you, your keyboard, and the files.
+
+Zcooter  **is** scooter (https://github.com/thomasschafer/scooter) and all the credit for functionality goes to that project.
 
 zcooter is a fork of scooter with a different UI and some additional features I added with the AI assitance ( I do read rust code, but I am not a rust developer, so the AI help was very much needed to navigate the codebase and add features without breaking much).
 
-Differences:
-- it has a different interface, which is more minimal
-- it has a single screen to facilitate a more streamlined workflow, rather than separate search and results screens
-- it adds more command line options
-- it provides vim bindings examples which is what I wanted to use scooter for but found the interface didn't match my workflow
-
-
 The Zcooter/ directory contains the documentation for zcooter, especially zcooter/changelog.md.
 
-Scooter's documentation is included below for reference, you should read it, note that zcooter keymaps will be different.
+## Why zcooter instead of sed, ripgrep, or your editor's built-in replace?
 
-You can build it with `cargo build --release`. The resulting **scooter** binary will be located at `target/release/scooter`. 
+`sed -i 's/foo/bar/g'` doesn't show you what it's about to change. Your editor's replace dialog buries the matches in a side panel. Zcooter puts every match front and center — file, line number, surrounding context, syntax-highlighted preview — and lets you accept or reject each one before anything touches disk.
 
-The binary is still called *scooter* because it **is** scooter just a different UI/UX, but you can rename it to *zcooter* if you like.
+It's the workflow you already know from `:s/old/new/gc` in vim, but working across your entire project at once, with a live preview pane and zero risk of accidentally clobbering the wrong line.
+
+## Built for people who live in the terminal
+
+Zcooter is a single binary with no runtime dependencies. It runs in your terminal, respects your `.gitignore`, and uses the same file walker as ripgrep under the hood. Pipe stdin into it, point it at a directory, or launch it from your editor — it adapts to however you work.
+
+The interface is minimal by design. One screen holds your search fields, match list, and preview. No tab-switching, no modal dialogs, no clutter. Everything you need is visible at once, and every keybinding is configurable — but the defaults are chosen to feel right out of the box.
 
 ## Minimalistic interface
 
 ![zcooter preview1](zcooter/media/screenshot_1.png)
 
-## Vim integration
+## Vim
+
+### Bindings
+
+If you're a vim or neovim user, zcooter speaks your language. Drop in the included vim config and you get:
+
+- **`:q`** to quit, **`:r`** to reset, **`:h`** for help — colon commands work exactly as you expect
+- **`j`/`k`** to navigate results, **`J`/`K`** to jump between files, **`g`/`G`** for top/bottom
+- **`v`** for visual multiselect, **`o`** to flip direction — just like vim's visual mode
+- **`z`-leader** for all toggles: `zl` (line wrap), `zh` (hidden files), `zm` (multiline), `zc` (fixed strings), `zw` (whole word), `zs` (case)
+- **`/`** to jump to search, **`%`** to jump to replace, **`i`** for insert mode, **`backspace`** to jump back and delete — the keys you already know
+
+The config is a single TOML file. Every single keybinding is remappable. If you prefer helix-style `C-s`/`C-r` for field focus, or want to swap `space` for `enter` on toggles, just change the config. The help screen always reflects your actual bindings, not some hard-coded reference card.
+
+### Integration
 
 See the zcooter/vim-bindings.md file for details on how to integrate zcooter with Vim or Neovim; make sure you read the instructions on auto-reloading files, as that is important to ensure you don't lose work when switching back to Vim after running scooter.
 
 ![zcooter preview2](zcooter/media/screenshot_2.png)
 
-### example of zcooter opened from vim to replace text in the current buffer
+#### example of zcooter opened from vim to replace text in the current buffer
 
 - press <leader>SF, that will modify the current file only
 - type the text you want to find in the "Search text" field, and the replacement text in the "Replace text" field
@@ -38,6 +55,24 @@ See the zcooter/vim-bindings.md file for details on how to integrate zcooter wit
 - you can perform multiple replacements without restarting scooter
 - press control-c to exit scooter and return to vim
 - vim will detect the changes and warn you
+
+## Build/Install
+
+**Build:**
+
+```
+cargo build --release
+```
+
+The resulting **scooter** binary will be located at `target/release/scooter`.  The binary is still called *scooter* because it **is** scooter just a different UI/UX.
+
+**Install:**
+
+```
+cargo install --path scooter
+```
+
+---
 
 ## Scooter documentation
 

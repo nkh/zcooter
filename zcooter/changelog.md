@@ -20,6 +20,15 @@
 - **Configurable `focus_fields`** — new `search.focus_fields` config option that defines an ordered list of field names for Tab navigation order. Accepted names: `search`, `replace`, `fixed`, `word`, `case`, `include`, `exclude`. When omitted, all fields are focusable in default order. Automatically integrates with `--no-file-filters` to remove hidden fields from the focus list.
 - **Default config template** — `default-config.toml` in the repo root contains all configuration sections and their default values, fully commented. Can be copied to `~/.config/scooter/config.toml` as a starting point.
 - **Vim bindings document** — `zcooter/vim-bindings.md` documents VimRun-based Vim/Neovim integration with `Scooter`, `VScooter` commands and leader-key mappings for opening scooter on the current file, git repo, or with a visual selection as search text.
+- **Esc-prefix command mode** — when search fields are focused, pressing `Esc` first enters command mode so that subsequent keypresses trigger commands (quit, reset, help, toggles) instead of being typed into search/replace text. In results focus, prefix keys work directly without the Esc prefix. This prevents accidental command triggering while editing fields.
+- **Configurable toggle bindings** — `toggle_fixed_strings` (default `A-x`), `toggle_match_whole_word` (default `A-w`), `toggle_match_case` (default `A-c`) can now be remapped in `[keys.search]`.
+- **Help screen reflects configured bindings** — the help screen displays your actual keybindings from `config.toml`, not hard-coded defaults. Changing a binding in config immediately updates what the help screen shows.
+- **Key bindings reference document** — `zcooter/key-bindings.md` provides comprehensive documentation of all keybindings, their defaults, Esc-prefix behavior, and configuration options.
+- **Vim-style keybindings config** — `zcooter/vim-config.toml` provides a complete vim-inspired configuration with `z`-leader toggles (`zl` line wrap, `zh` hidden files, `zm` multiline, `zc` fixed strings, `zw` whole word, `zs` case), colon commands (`:q`, `:r`, `:h`), and hjkl navigation.
+- **Configurable column resize keys** — `resize_column_shrink` (default `C-left`) and `resize_column_grow` (default `C-right`) in `[keys.search]`.
+- **Configurable field-focus keys** — `focus_search_field`, `focus_replace_field`, `focus_include_field`, `focus_exclude_field`, `focus_fixed_field`, and `fields_to_results` in `[keys.search.fields]` allow full control over field navigation.
+- **Configurable results keys** — `toggle_current_file_selected` (`*`), `enter_insert_mode` (`i`), `backspace_to_search` (`backspace`) in `[keys.search.results]`.
+- **Auto-refresh search after editor** — search results are automatically re-run when returning from the editor, catching any external file changes.
 
 ## Bug Fixes
 
@@ -31,6 +40,10 @@
 - Fixed blank lines appearing when `--no-file-filters` is set (space now reclaimed by file list/preview).
 - Fixed escape key delay when navigating back from results to fields — removed `Esc` from `back_to_fields` binding (use `Ctrl+O` instead). The delay was caused by terminal escape sequence disambiguation (~100ms). Removed the stale escape deprecation popup.
 - Fixed file finder key (`Ctrl+T`) conflicting with `toggle_hidden_files` (same default key). Changed file finder default to `Alt+F`.
+- Fixed field-only keys (Tab, Enter, Shift+Tab) leaking into search text when focus is on results — these keys now correctly trigger their commands instead of being inserted as text.
+- Fixed `A-f` key conflict — `toggle_fixed_strings` default changed from `A-f` to `A-x` to avoid shadowing `open_file_finder = "A-f"` in the fields keymap (the `lookup()` method checks `search_common` before focus-specific commands, so the common binding would always win).
+- Fixed Alt-fallback for terminals with short escape timeout — in environments like vim's `:terminal`, `Esc+key` sequences get fused into `Alt+key` by the terminal. zcooter now detects this and strips the Alt modifier when an Esc prefix was expected, allowing prefix keys to work in vim terminal.
+- Fixed two-char leader-key sequences (e.g., `zc`, `zh`) not being parsed correctly in the config file.
 
 ## Breaking Changes
 
@@ -44,7 +57,7 @@
 | Flag | Short | Description |
 |------|-------|-------------|
 | `--file-list-height N` | — | Set file list height in compact/narrow layout |
-| `--editable` | `-E` | Allow editing of CLI-pre-populated fields |
+| `--editable` | — | Allow editing of CLI-pre-populated fields (note: `-E` short flag is unavailable due to collision with `--files-to-exclude`) |
 | `--no-file-filters` | — | Hide include/exclude filter fields from the TUI |
 | `--file-finder-command CMD` | — | External command for file selection in include/exclude fields (overrides config) |
 | `--open-file-finder-key KEY` | — | Key that opens the file finder in include/exclude fields (e.g. `"A-f"`) |
